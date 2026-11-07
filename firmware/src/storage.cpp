@@ -45,6 +45,7 @@ void read_lines(const char* path, const std::function<void(char*)>& fn) {
 }  // namespace
 
 bool begin() {
+#ifndef BOARD_TDISPLAY_S3  // the test rig has no SD slot; its pins are the LCD bus
   board::sd_cs_high();
   delay(10);
   if (SD_MMC.setPins(pins::SD_CLK, pins::SD_CMD, pins::SD_D0) &&
@@ -53,6 +54,7 @@ bool begin() {
     log_i("Logging to microSD");
     return true;
   }
+#endif
   lfs_ok = LittleFS.begin(/*formatOnFail=*/true);
   log_w("No SD card; logging to internal flash: %d", lfs_ok);
   return lfs_ok;

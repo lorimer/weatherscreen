@@ -26,6 +26,11 @@ Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsS
   - the case was checked for collisions against Waveshare's STEP model.
 - Next step on the user's side: buy parts, print, flash, and work through the
   first-power-on checklist in README §6.
+- **Test rig (branch `tdisplay-s3`)**: `env:tdisplay` runs the same firmware on a LilyGO
+  T-Display-S3 Touch (320x170). The real 1024x600 UI renders into a PSRAM canvas and is
+  shown scaled down, or 1:1 with drag-to-pan. It exercises the real UI, touch, network,
+  analysis and web code; it says nothing about the RGB panel, GT911, SD or BME280.
+  See docs/TEST_RIG.md. Nothing in this port should reach the Waveshare build.
 
 ## Requirements the user gave (keep these; they were explicit)
 
@@ -93,6 +98,8 @@ firmware/src/
   config.h        pins, panel timing, IO-expander bits, colours (match the mockup)
   board.*         I2C (Wire on 8/9), IO expander, RGB panel (esp_lcd), GT911 touch +
                   invisible touch filter, LVGL glue, backlight
+  board_tdisplay.cpp  same board:: API for the T-Display-S3 test rig (env tdisplay);
+                  replaces board.cpp. See docs/TEST_RIG.md
   ui.*            routing, sunrise/sunset dimming, OTA overlay
   ui_main.cpp     main screen (the layout above); pain buttons fire on PRESSED
   ui_setup.cpp    first-time wizard, maintenance menu, custom on-screen keyboard

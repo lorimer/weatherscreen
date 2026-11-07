@@ -37,6 +37,7 @@
 #include <lvgl.h>
 
 #include "config.h"
+#include "testrig.h"
 
 namespace board {
 namespace {
@@ -274,6 +275,7 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
   const bool usb_up = (bool)Serial;  // true once a host opens the CDC port
   if (usb_up && !usb_was_up) rig_banner();
   usb_was_up = usb_up;
+  testrig::poll();
 
   // KEY switches view without the taps reaching the UI; BOOT walks the 1:1 window.
   if (btn_pressed(b_key, now)) set_view(view == VIEW_FIT ? VIEW_1TO1 : VIEW_FIT);

@@ -53,6 +53,12 @@ String profile_json(int64_t from, int64_t to);    // pain by hour of day
 String correlation_json(int64_t from, int64_t to);// pressure change vs pain, lags 0-48 h
 void write_daily_csv(Print& out, int64_t from, int64_t to);
 
+#ifdef BOARD_TDISPLAY_S3
+// Test rig only (see testrig.cpp): seed and wipe tap history.
+void add_tap_at(int64_t t, int score);
+void clear_taps();
+#endif
+
 // Diagnostics
 size_t tap_count();
 size_t pressure_count();

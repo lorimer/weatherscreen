@@ -44,7 +44,6 @@ def bisquare(r, c):
 def local_fit(ts, vs, w, t, h_s):
     i0 = bisect.bisect_left(ts, t - int(h_s))
     sw = sx = sy = 0.0
-    left = right = False
     idx = []
     for i in range(i0, len(ts)):
         if ts[i] > t + h_s:
@@ -55,17 +54,21 @@ def local_fit(ts, vs, w, t, h_s):
             continue
         xh = dx / HOUR
         sw += k; sx += k * xh; sy += k * vs[i]
-        left |= xh < -0.25; right |= xh > 0.25
         idx.append((i, k, xh))
     if sw < 1e-9:
         return None
     xm, ym = sx / sw, sy / sw
     val = ym
-    if left and right:
+    # The slope carries the fit from the weighted mean at xm across to time t, so the
+    # further the nearby taps sit to one side, the more it is extrapolation. Damp it by
+    # how far off-centre they are: zero at the edges of the data, one in the middle.
+    h_h = h_s / HOUR
+    trust = max(0.0, 1.0 - 2.0 * abs(xm) / h_h)
+    if trust > 0:
         sxx = sum(k * (xh - xm) ** 2 for _, k, xh in idx)
         sxy = sum(k * (xh - xm) * (vs[i] - ym) for i, k, xh in idx)
-        if sxx > 1e-6:
-            val = ym - (sxy / sxx) * xm
+        if sxx / sw > 0.25:
+            val = ym - trust * (sxy / sxx) * xm
     return min(5.0, max(1.0, val))
 
 
@@ -111,7 +114,7 @@ class Result:
         g = self.gap_h(t)
         if g > self.p.gap_h:
             return None
-        h = (self.p.bandwidth_h if g <= self.p.bandwidth_h else self.p.gap_h) * HOUR
+        h = max(self.p.bandwidth_h, g) * HOUR  # grows smoothly across a gap
         w = [b * r for b, r in zip(self.base, self.robust)]
         v = local_fit(self.ts, self.vs, w, t, h)
         return v if v is not None else local_fit(self.ts, self.vs, self.base, t, h)

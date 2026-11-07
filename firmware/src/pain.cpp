@@ -37,7 +37,6 @@ bool local_fit(const std::vector<Tap>& taps, const std::vector<float>& w, int64_
                double h_s, float* out) {
   size_t i0 = lower(taps, t - static_cast<int64_t>(h_s));
   double sw = 0, sx = 0, sy = 0;
-  bool left = false, right = false;
   for (size_t i = i0; i < taps.size() && taps[i].t <= t + h_s; ++i) {
     double dx = static_cast<double>(taps[i].t - t);
     double k = tricube(dx / h_s) * w[i];
@@ -46,13 +45,20 @@ bool local_fit(const std::vector<Tap>& taps, const std::vector<float>& w, int64_
     sw += k;
     sx += k * xh;
     sy += k * taps[i].v;
-    if (xh < -0.25) left = true;
-    if (xh > 0.25) right = true;
   }
   if (sw < 1e-9) return false;
   double xm = sx / sw, ym = sy / sw;
   double val = ym;
-  if (left && right) {
+  // The slope term carries the fit from the weighted mean at xm across to time t, so
+  // the further the nearby taps sit to one side, the more it is extrapolation and the
+  // less it can be trusted. Damp it by how far off-centre they are, which goes to zero
+  // at the edges of the data (and at "now") and to one in the middle.
+  //
+  // This used to be an on/off test for taps on both sides. That made the estimator
+  // switch form abruptly as t swept past a tap, which put visible steps in the line.
+  const double h_h = h_s / kHour;
+  const double trust = std::max(0.0, 1.0 - 2.0 * std::fabs(xm) / h_h);
+  if (trust > 0) {
     double sxx = 0, sxy = 0;
     for (size_t i = i0; i < taps.size() && taps[i].t <= t + h_s; ++i) {
       double dx = static_cast<double>(taps[i].t - t);
@@ -62,7 +68,9 @@ bool local_fit(const std::vector<Tap>& taps, const std::vector<float>& w, int64_
       sxx += k * xh * xh;
       sxy += k * xh * (taps[i].v - ym);
     }
-    if (sxx > 1e-6) val = ym - (sxy / sxx) * xm;  // value at x = 0 (time t)
+    // sxx is the weighted spread in hours^2; when the taps are nearly coincident the
+    // slope is meaningless, so require a real spread rather than just non-zero.
+    if (sxx / sw > 0.25) val = ym - trust * (sxy / sxx) * xm;  // value at x = 0 (time t)
   }
   *out = static_cast<float>(std::min(5.0, std::max(1.0, val)));
   return true;
@@ -129,7 +137,7 @@ bool trend_at(const Result& r, int64_t t, float* out) {
   if (taps.empty()) return false;
   float gap = nearest_gap_h(taps, t);
   if (gap > r.p.gap_h) return false;
-  double h = (gap <= r.p.bandwidth_h ? r.p.bandwidth_h : r.p.gap_h) * kHour;
+  double h = std::max(r.p.bandwidth_h, gap) * kHour;  // grows smoothly across a gap
   std::vector<float> w(taps.size());
   for (size_t i = 0; i < taps.size(); ++i) w[i] = r.base_w[i] * r.robust_w[i];
   if (local_fit(taps, w, t, h, out)) return true;
@@ -150,7 +158,7 @@ std::vector<TrendPoint> trend_series(const Result& r, int64_t from, int64_t to, 
     TrendPoint tp{t, 0.0f, false};
     float gap = nearest_gap_h(taps, t);
     if (gap <= r.p.gap_h) {
-      double h = (gap <= r.p.bandwidth_h ? r.p.bandwidth_h : r.p.gap_h) * kHour;
+      double h = std::max(r.p.bandwidth_h, gap) * kHour;  // grows smoothly across a gap
       tp.ok = local_fit(taps, w, t, h, &tp.v) || local_fit(taps, wb, t, h, &tp.v);
     }
     out.push_back(tp);

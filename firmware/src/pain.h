@@ -7,6 +7,10 @@
 //  1. Density balancing: each tap's base weight is 1 / (taps within +-density_window),
 //     so a burst of 57 taps carries about as much weight as one tap on its own.
 //  2. Robust local trend: locally weighted regression (tricube kernel, +-bandwidth).
+//     The slope term is damped by how far off-centre the nearby taps sit, so the fit
+//     slides from local-linear in the middle of the data to the local mean at the edges
+//     (and at "now") instead of switching between the two. The kernel also widens
+//     smoothly across a gap. Both keep steps out of the drawn line.
 //  3. Outlier down-weighting that adapts to usage: a tap far from the trend loses
 //     weight (bisquare on robust residual scale), but only in proportion to how much
 //     nearby evidence exists to contradict it. A lone tap keeps full weight.

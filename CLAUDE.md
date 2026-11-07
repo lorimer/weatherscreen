@@ -128,8 +128,14 @@ loop must hold `board::lvgl_lock()`.
 
 ### Pain algorithm (pain.cpp, mirrored in tools/analyze.py)
 1. Density weight = 1 / (taps within ±1.5 h): a burst counts as one episode.
-2. Locally weighted regression trend (tricube, ±12 h). Local-linear only when there is
-   data on both sides, otherwise local-constant (avoids wild extrapolation at "now").
+2. Locally weighted regression trend (tricube, ±12 h). The slope term is damped by
+   `trust = max(0, 1 - 2|xm|/h)`, where `xm` is the weighted mean offset of the nearby
+   taps, so the fit slides continuously from local-linear in the middle of the data to
+   the local mean at the edges and at "now" (which is what avoids wild extrapolation).
+   The kernel widens smoothly to `max(bandwidth, gap)` rather than stepping to `gap_h`.
+   **Both of these exist to keep steps out of the drawn line**: the earlier on/off test
+   for "data on both sides" made the estimator change form as the sample time swept
+   past a tap, which put jumps of over 2 points between adjacent 30-minute samples.
 3. Robust reweighting: bisquare on the residual with cutoff = max(2.5, 4 × MAD).
    Outlier power scales with nearby evidence (other taps within ±12 h / 2), so sparse
    use isn't penalised. 4 iterations.

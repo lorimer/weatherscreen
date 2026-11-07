@@ -20,8 +20,9 @@ Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsS
 - **Never run on the Waveshare 7B yet**, but no longer never run at all. The firmware
   was brought up on a LilyGO T-Display-S3 (a 320x170 panel) as a temporary rig, with
   the real 1024x600 UI rendered into a PSRAM canvas and shown scaled. That rig is
-  removed again; see "What the hardware bring-up found" below for what it proved, and
-  the `tdisplay-s3` branch history for how it worked.
+  removed again; see "What the hardware bring-up found" below for what it proved. The
+  rig itself is in this branch's history, between v1.1.0 and v1.2.0, if it is ever
+  wanted again.
 - Verified off-device:
   - the firmware compiles (PlatformIO, about 39 % of the 6.25 MB app slot);
   - the analysis has host unit tests (`test_pain.cpp`, `test_trends.cpp`), and the

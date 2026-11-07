@@ -64,5 +64,11 @@ constexpr uint32_t BG = 0xF6F3EC, TEXT = 0x1C1B19, TEXT2 = 0x3D3A35, MUTED = 0x5
 constexpr uint32_t RULE = 0xDDD6C8, AXIS = 0xCFC7B6, MIDLINE = 0xE4DED1;
 constexpr uint32_t PRESSURE = 0x2B5F9E, PAIN = 0xB3261E, FALL_C = 0xA84B0C, RISE_C = 0x2B5F9E;
 constexpr uint32_t KEY = 0xFFFFFF, KEY_SHADOW = 0xCFC7B6, KEY_ALT = 0xE6E0D3, ACCENT = 0x2B5F9E;
-constexpr uint32_t PAIN_BTN[5] = {0x2F7D4F, 0x5E7F24, 0x9C6A0E, 0xC24E17, 0xB3261E};  // 1..5
+// 1..5, blue (least) to red (worst). Lightness falls about 2.4 L* a step as well as
+// the hue turning, so the scale is still readable if the colours are not: red/green is
+// the pair most often confused, and these buttons are for an elderly user. White text
+// clears 4.5:1 on all five (5.0 at the blue end, 7.2 at the red).
+// The route is cool to warm through a desaturated middle rather than straight through
+// magenta, which reads as a severity scale instead of a rainbow.
+constexpr uint32_t PAIN_BTN[5] = {0x4270B1, 0x736191, 0x7D5872, 0x9B3D57, 0xAB1D19};
 }  // namespace col

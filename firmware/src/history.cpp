@@ -8,6 +8,7 @@
 #include "sensor.h"
 #include "settings.h"
 #include "storage.h"
+#include "trends.h"
 
 namespace history {
 namespace {
@@ -15,10 +16,7 @@ namespace {
 constexpr float HPA_TO_INHG = 0.0295300f;
 constexpr int64_t KEEP_PRESSURE_S = 400LL * 86400;
 
-struct PSample {
-  int64_t t;
-  float hpa;  // sea level
-};
+using PSample = trends::PSample;  // sea-level hPa
 
 SemaphoreHandle_t mtx = xSemaphoreCreateRecursiveMutex();
 struct Lock {
@@ -108,20 +106,28 @@ const char* trend_name(Trend t) {
 
 String num(float v, int dec = 2) { return std::isnan(v) ? String("null") : String(v, dec); }
 
-// Hourly series used by the analysis endpoints.
-struct Hourly {
-  int64_t start;
-  std::vector<float> pain, pressure;
+// Copies of the raw data, taken under the lock, so slow analysis runs unlocked.
+struct Copy {
+  std::vector<pain::Tap> taps;
+  std::vector<PSample> pres;
+  int32_t off;
 };
 
-Hourly hourly(int days, const pain::Result& r) {
-  Hourly h;
-  int64_t end = now_s() - now_s() % 3600;
-  h.start = end - (int64_t)days * 86400;
-  auto tr = pain::trend_series(r, h.start, end, 3600);
-  for (auto& p : tr) h.pain.push_back(p.ok ? p.v : NAN);
-  for (int64_t t = h.start; t <= end; t += 3600) h.pressure.push_back(local_at(t, 30 * 60));
-  return h;
+Copy copy_all() {
+  Lock l;
+  Copy c;
+  c.taps = taps;
+  c.pres = psamples;
+  c.off = wx.valid ? wx.utc_offset_s : settings::get().utc_offset_s;
+  return c;
+}
+
+int64_t clamp_range(int64_t* from, int64_t* to) {
+  int64_t now = now_s();
+  if (*to <= 0 || *to > now) *to = now;
+  if (*from <= 0 || *from >= *to) *from = *to - 2 * 86400;
+  if (*to - *from > 3700LL * 86400) *from = *to - 3700LL * 86400;  // ~10 years
+  return *to - *from;
 }
 
 }  // namespace
@@ -247,30 +253,40 @@ String status_json() {
   return j;
 }
 
-String series_json(int hours) {
-  hours = constrain(hours, 6, 24 * 60);
-  std::vector<pain::Tap> copy;
+String range_json() {
+  Lock l;
+  int64_t first = 0;
+  if (!taps.empty()) first = taps.front().t;
+  if (!psamples.empty() && (!first || psamples.front().t < first)) first = psamples.front().t;
+  return "{\"first\":" + String((long long)first) + ",\"now\":" + String((long long)now_s()) + "}";
+}
+
+String series_json(int64_t from, int64_t to) {
+  int64_t span = clamp_range(&from, &to);
+  int64_t step = trends::pick_step(span, 600);
+  from -= from % step;
+  Copy c = copy_all();
+  // Taps from two days before the window still shape its start.
+  std::vector<pain::Tap> sel;
+  for (auto& t : c.taps)
+    if (t.t >= from - 2 * 86400 && t.t <= to + 2 * 86400) sel.push_back(t);
+  auto r = pain::analyze(sel, settings::get().pain);
+  auto tr = pain::trend_series(r, from, to, step);
+
+  String j;
+  j.reserve(16 * tr.size() + 64);
+  j = "{\"start\":" + String((long long)from) + ",\"step\":" + String((long long)step) + ",\"pressure_inhg\":[";
   {
     Lock l;
-    copy = taps;
-  }
-  int64_t now = now_s();
-  int64_t step = hours <= 72 ? 1800 : 3600;
-  int64_t end = now - now % step, start = end - (int64_t)hours * 3600;
-  std::vector<pain::Tap> recent;
-  for (auto& t : copy)
-    if (t.t >= start - 2 * 86400) recent.push_back(t);
-  auto r = pain::analyze(recent, settings::get().pain);
-  auto tr = pain::trend_series(r, start, end, step);
-
-  Lock l;
-  float off = api_offset();
-  String j = "{\"start\":" + String((long long)start) + ",\"step\":" + String((long long)step);
-  j += ",\"pressure_inhg\":[";
-  for (int64_t t = start, i = 0; t <= end; t += step, ++i) {
-    float p = merged_at(t, off);
-    if (i) j += ',';
-    j += num(std::isnan(p) ? NAN : p * HPA_TO_INHG, 3);
+    float off = api_offset();
+    for (size_t i = 0; i < tr.size(); ++i) {
+      int64_t t = from + (int64_t)i * step;
+      // Average over the step for long ranges; nearest 20 min for short ones.
+      float p = step > 1800 ? trends::pressure_near(psamples, t, step / 2) : merged_at(t, off);
+      if (std::isnan(p) && step > 1800) p = merged_at(t, off);
+      if (i) j += ',';
+      j += num(std::isnan(p) ? NAN : p * HPA_TO_INHG, 3);
+    }
   }
   j += "],\"pain\":[";
   for (size_t i = 0; i < tr.size(); ++i) {
@@ -278,105 +294,96 @@ String series_json(int hours) {
     j += tr[i].ok ? String(tr[i].v, 2) : String("null");
   }
   j += "],\"taps\":[";
+  // Individual taps only for ranges where they can be seen (<= 31 days).
   bool first = true;
-  for (size_t i = 0; i < r.taps.size(); ++i) {
-    if (r.taps[i].t < start) continue;
-    if (!first) j += ',';
-    first = false;
-    j += "[" + String((long long)r.taps[i].t) + "," + String((int)r.taps[i].v) + "," + String(r.robust_w[i], 2) + "]";
-  }
-  j += "]}";
-  return j;
-}
-
-String analysis_json(int days) {
-  days = constrain(days, 7, 365);
-  std::vector<pain::Tap> copy;
-  {
-    Lock l;
-    copy = taps;
-  }
-  auto r = pain::analyze(copy, settings::get().pain);
-  int32_t off_s = wx.valid ? wx.utc_offset_s : settings::get().utc_offset_s;
-  auto daily = pain::daily_values(r, off_s);
-
-  Lock l;
-  Hourly h = hourly(days, r);
-  String j = "{\"days\":" + String(days) + ",\"daily\":[";
-  int64_t since = now_s() - (int64_t)days * 86400;
-  bool first = true;
-  for (auto& d : daily) {
-    if (d.day_start < since) continue;
-    // Daily mean pressure and the largest 24 h fall ending that day.
-    double ps = 0;
-    int pn = 0;
-    float maxdrop = NAN;
-    for (int64_t t = d.day_start; t < d.day_start + 86400; t += 3600) {
-      float p = local_at(t, 30 * 60), p24 = local_at(t - 86400, 30 * 60);
-      if (!std::isnan(p)) { ps += p; ++pn; }
-      if (!std::isnan(p) && !std::isnan(p24)) {
-        float drop = p24 - p;
-        if (std::isnan(maxdrop) || drop > maxdrop) maxdrop = drop;
-      }
-    }
-    if (!first) j += ',';
-    first = false;
-    j += "{\"day\":" + String((long long)(d.day_start + off_s)) + ",\"pain\":" + String(d.v, 2) +
-         ",\"taps\":" + String(d.taps) + ",\"low_conf\":" + (d.low_confidence ? "true" : "false") +
-         ",\"pressure_inhg\":" + num(pn ? float(ps / pn) * HPA_TO_INHG : NAN, 2) +
-         ",\"max_24h_drop_inhg\":" + num(std::isnan(maxdrop) ? NAN : maxdrop * HPA_TO_INHG, 3) + "}";
-  }
-  j += "],\"correlation\":[";
-  // Pain at hour t+lag against the pressure change over the window ending at hour t.
-  const int windows[] = {3, 12, 24};
-  first = true;
-  for (int w : windows) {
-    std::vector<float> dp(h.pressure.size(), NAN);
-    for (size_t i = w; i < h.pressure.size(); ++i)
-      if (!std::isnan(h.pressure[i]) && !std::isnan(h.pressure[i - w])) dp[i] = h.pressure[i] - h.pressure[i - w];
-    for (int lag = 0; lag <= 48; lag += 3) {
-      std::vector<float> a, b;
-      for (size_t i = 0; i + lag < h.pain.size(); ++i) {
-        a.push_back(dp[i]);
-        b.push_back(h.pain[i + lag]);
-      }
-      int n = 0;
-      float c = pain::pearson(a, b, 48, &n);
+  if (span <= 31LL * 86400) {
+    for (size_t i = 0; i < r.taps.size(); ++i) {
+      if (r.taps[i].t < from || r.taps[i].t > to) continue;
       if (!first) j += ',';
       first = false;
-      j += "{\"window_h\":" + String(w) + ",\"lag_h\":" + String(lag) + ",\"r\":" + num(c, 3) + ",\"n\":" + String(n) + "}";
+      j += "[" + String((long long)r.taps[i].t) + "," + String((int)r.taps[i].v) + "," + String(r.robust_w[i], 2) + "]";
     }
   }
   j += "]}";
   return j;
 }
 
-void write_daily_csv(Print& out) {
-  std::vector<pain::Tap> copy;
-  {
-    Lock l;
-    copy = taps;
+String daily_json(int64_t from, int64_t to) {
+  clamp_range(&from, &to);
+  Copy c = copy_all();
+  auto r = pain::analyze(c.taps, settings::get().pain);
+  auto days = trends::daily(r, c.pres, c.off, from, to);
+  String j;
+  j.reserve(days.size() * 120 + 32);
+  j = "{\"utc_offset\":" + String(c.off) + ",\"days\":[";
+  for (size_t i = 0; i < days.size(); ++i) {
+    const auto& d = days[i];
+    if (i) j += ',';
+    j += "{\"day\":" + String((long long)(d.day_start + c.off));
+    j += ",\"pain\":" + (d.taps ? String(d.pain, 2) : String("null"));
+    j += ",\"taps\":" + String(d.taps);
+    j += ",\"low_conf\":" + String(d.low_conf ? "true" : "false");
+    j += ",\"p_mean\":" + num(d.p_n ? d.p_mean * HPA_TO_INHG : NAN, 3);
+    j += ",\"p_min\":" + num(d.p_n ? d.p_min * HPA_TO_INHG : NAN, 3);
+    j += ",\"p_max\":" + num(d.p_n ? d.p_max * HPA_TO_INHG : NAN, 3);
+    j += ",\"fall24\":" + num(d.has_change ? d.fall24 * HPA_TO_INHG : NAN, 3);
+    j += ",\"rise24\":" + num(d.has_change ? d.rise24 * HPA_TO_INHG : NAN, 3);
+    j += "}";
   }
-  auto r = pain::analyze(copy, settings::get().pain);
-  int32_t off_s = wx.valid ? wx.utc_offset_s : settings::get().utc_offset_s;
-  out.print("date,pain_trend_mean,taps,low_confidence,mean_pressure_inhg\n");
-  for (auto& d : pain::daily_values(r, off_s)) {
-    time_t lt = d.day_start + off_s;
+  j += "]}";
+  return j;
+}
+
+String profile_json(int64_t from, int64_t to) {
+  clamp_range(&from, &to);
+  Copy c = copy_all();
+  auto r = pain::analyze(c.taps, settings::get().pain);
+  auto hp = trends::hour_profile(r, c.off, from, to);
+  String j = "{\"pain\":[";
+  for (int h = 0; h < 24; ++h) { if (h) j += ','; j += num(hp.pain[h], 2); }
+  j += "],\"taps\":[";
+  for (int h = 0; h < 24; ++h) { if (h) j += ','; j += String(hp.taps[h]); }
+  return j + "]}";
+}
+
+String correlation_json(int64_t from, int64_t to) {
+  clamp_range(&from, &to);
+  Copy c = copy_all();
+  auto r = pain::analyze(c.taps, settings::get().pain);
+  int64_t start = from - from % 3600;
+  auto tr = pain::trend_series(r, start, to, 3600);
+  std::vector<float> pain_h, pres_h;
+  for (size_t i = 0; i < tr.size(); ++i) {
+    pain_h.push_back(tr[i].ok ? tr[i].v : NAN);
+    pres_h.push_back(trends::pressure_near(c.pres, start + (int64_t)i * 3600, 1800));
+  }
+  auto lc = trends::lag_correlation(pain_h, pres_h, {3, 12, 24}, 48, 3);
+  String j = "{\"lags\":[";
+  for (size_t i = 0; i < lc.size(); ++i) {
+    if (i) j += ',';
+    j += "{\"window_h\":" + String(lc[i].window_h) + ",\"lag_h\":" + String(lc[i].lag_h) + ",\"r\":" +
+         num(lc[i].r, 3) + ",\"n\":" + String(lc[i].n) + "}";
+  }
+  return j + "]}";
+}
+
+void write_daily_csv(Print& out, int64_t from, int64_t to) {
+  clamp_range(&from, &to);
+  Copy c = copy_all();
+  auto r = pain::analyze(c.taps, settings::get().pain);
+  out.print("date,pain_trend_mean,taps,low_confidence,pressure_mean_inhg,pressure_min_inhg,"
+            "pressure_max_inhg,largest_24h_fall_inhg,largest_24h_rise_inhg\n");
+  for (const auto& d : trends::daily(r, c.pres, c.off, from, to)) {
+    time_t lt = d.day_start + c.off;
     struct tm tmv;
     gmtime_r(&lt, &tmv);
     char date[16];
     strftime(date, sizeof date, "%Y-%m-%d", &tmv);
-    double ps = 0;
-    int pn = 0;
-    {
-      Lock l;
-      for (int64_t t = d.day_start; t < d.day_start + 86400; t += 3600) {
-        float p = local_at(t, 30 * 60);
-        if (!std::isnan(p)) { ps += p; ++pn; }
-      }
-    }
-    out.printf("%s,%.2f,%d,%d,%s\n", date, d.v, d.taps, d.low_confidence ? 1 : 0,
-               pn ? String(float(ps / pn) * HPA_TO_INHG, 3).c_str() : "");
+    auto f = [](bool ok, float v, int dec) { return ok ? String(v, dec) : String(""); };
+    out.printf("%s,%s,%d,%d,%s,%s,%s,%s,%s\n", date, f(d.taps > 0, d.pain, 2).c_str(), d.taps,
+               d.low_conf ? 1 : 0, f(d.p_n > 0, d.p_mean * HPA_TO_INHG, 3).c_str(),
+               f(d.p_n > 0, d.p_min * HPA_TO_INHG, 3).c_str(), f(d.p_n > 0, d.p_max * HPA_TO_INHG, 3).c_str(),
+               f(d.has_change, d.fall24 * HPA_TO_INHG, 3).c_str(), f(d.has_change, d.rise24 * HPA_TO_INHG, 3).c_str());
   }
 }
 

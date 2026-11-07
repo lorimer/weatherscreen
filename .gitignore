@@ -5,3 +5,5 @@ firmware/test/host/out/
 tools/node_modules/
 tools/fonts/
 case/__pycache__/
+__pycache__/
+tools/package*.json

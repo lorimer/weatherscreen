@@ -78,16 +78,44 @@ void h_status() {
   send_json(h);
 }
 
-void h_series() {
-  if (!auth()) return;
-  int hours = server.hasArg("hours") ? server.arg("hours").toInt() : 48;
-  send_json(history::series_json(hours));
+// ?from=&to= (unix seconds) or ?hours=N ending now.
+void range_args(int64_t* from, int64_t* to) {
+  *to = server.hasArg("to") ? atoll(server.arg("to").c_str()) : 0;
+  *from = server.hasArg("from") ? atoll(server.arg("from").c_str()) : 0;
+  if (!*from && server.hasArg("hours")) *from = (int64_t)time(nullptr) - (int64_t)server.arg("hours").toInt() * 3600;
 }
 
-void h_analysis() {
+void h_range() {
   if (!auth()) return;
-  int days = server.hasArg("days") ? server.arg("days").toInt() : 90;
-  send_json(history::analysis_json(days));
+  send_json(history::range_json());
+}
+
+void h_series() {
+  if (!auth()) return;
+  int64_t f, t;
+  range_args(&f, &t);
+  send_json(history::series_json(f, t));
+}
+
+void h_daily() {
+  if (!auth()) return;
+  int64_t f, t;
+  range_args(&f, &t);
+  send_json(history::daily_json(f, t));
+}
+
+void h_profile() {
+  if (!auth()) return;
+  int64_t f, t;
+  range_args(&f, &t);
+  send_json(history::profile_json(f, t));
+}
+
+void h_correlation() {
+  if (!auth()) return;
+  int64_t f, t;
+  range_args(&f, &t);
+  send_json(history::correlation_json(f, t));
 }
 
 void h_settings_get() {
@@ -182,10 +210,13 @@ class StringPrint : public Print {
   size_t write(uint8_t c) override { s += (char)c; return 1; }
 };
 
-void h_daily() {
+void h_daily_csv() {
   if (!auth()) return;
+  int64_t f, t;
+  range_args(&f, &t);
+  if (!f) f = 1;  // whole history by default
   StringPrint p;
-  history::write_daily_csv(p);
+  history::write_daily_csv(p, f, t);
   server.sendHeader("Content-Disposition", "attachment; filename=daily.csv");
   server.send(200, "text/csv", p.s);
 }
@@ -243,14 +274,17 @@ void begin() {
   server.on("/", HTTP_GET, h_index);
   server.on("/api/status", HTTP_GET, h_status);
   server.on("/api/series", HTTP_GET, h_series);
-  server.on("/api/analysis", HTTP_GET, h_analysis);
+  server.on("/api/range", HTTP_GET, h_range);
+  server.on("/api/daily", HTTP_GET, h_daily);
+  server.on("/api/profile", HTTP_GET, h_profile);
+  server.on("/api/correlation", HTTP_GET, h_correlation);
   server.on("/api/settings", HTTP_GET, h_settings_get);
   server.on("/api/settings", HTTP_POST, h_settings_post);
   server.on("/api/geocode", HTTP_GET, h_geocode);
   server.on("/api/restart", HTTP_POST, h_restart);
   server.on("/export/pain.csv", HTTP_GET, [] { stream_file("/pain.csv", "pain.csv"); });
   server.on("/export/pressure.csv", HTTP_GET, [] { stream_file("/pressure.csv", "pressure.csv"); });
-  server.on("/export/daily.csv", HTTP_GET, h_daily);
+  server.on("/export/daily.csv", HTTP_GET, h_daily_csv);
   server.on("/update", HTTP_POST, h_update_done, h_update_upload);
   server.onNotFound([] { server.send(404, "text/plain", "Not found"); });
   server.begin();

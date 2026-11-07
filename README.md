@@ -16,6 +16,10 @@ gesture: tap a number.
 - **Forgiving statistics.** Mis-taps, bursts of repeated taps and irregular use are
   handled in the analysis, not by the user. The screen shows a smoothed pain trend under
   the pressure graph, and the web page correlates pain with pressure changes.
+- **Long-term trends on the web page.** View 2 days up to a year or the whole history. Pick
+  a custom range or drag across a chart to zoom. You get daily pressure ranges and
+  falls, daily pain with a 7-day average, pain against pressure falls, how many hours
+  later pain follows, pain by time of day, and month-by-month summaries.
 - **Hands-off maintenance.** A password-protected web page, over-the-air updates with
   automatic rollback, a fallback hotspot if Wi-Fi is lost, and dimming at sunset.
 - **Printable case.** A tabletop stand at an 18° tilt holds the glass flush with the front,
@@ -28,6 +32,10 @@ gesture: tap a number.
 | Case, front | Case, side | Case, back |
 |---|---|---|
 | ![Case front](docs/preview_front.png) | ![Case side](docs/preview_side.png) | ![Case back](docs/preview_back.png) |
+
+| Web page: a year of trends | Zoomed in, with hover readout |
+|---|---|
+| ![Trends, one year](docs/web_trends_year.png) | ![Trends, zoomed](docs/web_trends_zoom.png) |
 
 The screenshots are rendered on a PC from the real firmware UI code, using sample data
 (see `firmware/test/host`).
@@ -153,7 +161,21 @@ model. Set `TABS` in `case/case.py` to the mirrored X values and re-export.
 The web page (user `admin`, maintenance password) has four tabs:
 
 - **Overview**: weather and sensor status, storage, memory, and touch statistics (accepted taps vs. filtered glitches and palm touches).
-- **History & analysis**: pressure and pain charts. Faded dots are taps judged likely mis-taps. Also daily values and how pain tracks pressure changes (3, 12 and 24 h, lags 0-48 h).
+- **Trends**: any range from 2 days to the whole history (presets, a custom date range,
+  back/forward buttons, or drag across a chart to zoom; double-click zooms out).
+  - Ranges up to about 2 weeks show the detail: the pressure line, the pain trend line,
+    and every tap (faded dots are taps judged likely mis-taps).
+  - Longer ranges switch to daily summaries: the daily pressure low-high band and
+    average, each day's pain with a 7-day average, and the largest 24-hour pressure fall
+    each day.
+  - A summary for the range: average pain, days logged, pressure range, the number of
+    "big fall" days (threshold adjustable), and pain on and after big-fall days compared
+    with other days.
+  - Pain against pressure fall (one dot per day, same day or the day before), with a
+    best-fit line and a plain-language strength rating.
+  - How many hours after a 3, 12 or 24 h pressure change pain tends to follow (0-48 h).
+  - Pain by time of day, a month-by-month table, and daily values downloadable for
+    the selected range.
 - **Settings**: device name, location, brightness, Wi-Fi, password, and analysis parameters.
 - **Data & updates**: CSV downloads, firmware upload, restart.
 
@@ -188,6 +210,8 @@ python3 tools/analyze.py pain.csv pressure.csv --utc-offset -7 --plot chart.png
 ## 9. Developer notes
 
 - `firmware/test/test_pain.cpp`: analysis unit tests (`g++ -std=c++17 -I../src test_pain.cpp ../src/pain.cpp && ./a.out`).
+- `firmware/test/test_trends.cpp`: tests for the long-term aggregates (same build line, add `../src/trends.cpp`).
+- `firmware/test/web/mock_server.py`: serves the real web page with 14 months of synthetic data (`python3 mock_server.py`, then open http://localhost:8765). `shoot.py` takes Playwright screenshots of it.
 - `firmware/test/host/build.sh`: renders the real screens to PNG on a PC (after one `pio run`), for checking layout changes without hardware.
 - Fonts: Atkinson Hyperlegible (Braille Institute, SIL OFL), regenerated with `tools/gen_fonts.sh`; icons with `tools/gen_icons.py`.
 - Board details (pins, timing, IO expander at 0x24, inverted backlight PWM) come from Waveshare's examples: github.com/waveshareteam/ESP32-S3-Touch-LCD-7B.

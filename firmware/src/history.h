@@ -44,11 +44,14 @@ bool needs_recompute();         // a new tap is waiting (debounced by caller)
 // UI: copies the latest snapshot if its version differs from `have`.
 bool snapshot_if_newer(uint32_t have, Snapshot* out);
 
-// Web API helpers (JSON strings).
+// Web API helpers (JSON strings). Ranges are unix seconds [from, to); 0 = defaults.
 String status_json();
-String series_json(int hours);
-String analysis_json(int days);
-void write_daily_csv(Print& out);
+String range_json();                              // first data point and now
+String series_json(int64_t from, int64_t to);     // pressure + pain trend (+ taps if <= 31 days)
+String daily_json(int64_t from, int64_t to);      // per-day pain and pressure stats
+String profile_json(int64_t from, int64_t to);    // pain by hour of day
+String correlation_json(int64_t from, int64_t to);// pressure change vs pain, lags 0-48 h
+void write_daily_csv(Print& out, int64_t from, int64_t to);
 
 // Diagnostics
 size_t tap_count();

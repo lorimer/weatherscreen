@@ -202,8 +202,9 @@ bool cst_write(uint8_t reg, uint8_t v) {
 }
 
 // Touch state, the view gesture, and the deferred click used in 1:1 view.
-constexpr int PAN_SLOP = 6;   // movement beyond this turns a 1:1 contact into a pan
-constexpr int TAP_SLOP = 8;   // movement up to this still counts as a tap
+constexpr int PAN_SLOP = 6;      // movement beyond this turns a 1:1 contact into a pan
+constexpr int TAP_SLOP = 8;      // movement up to this still counts as a tap
+constexpr int PRESS_DELAY = 120; // in 1:1, a still finger becomes a real press after this
 constexpr int MULTI_GAP = 600, MULTI_DIST = 60;
 
 struct {
@@ -213,6 +214,7 @@ struct {
   int lx = 0, ly = 0;          // latest screen coords
   bool panning = false;
   int pan_x0 = 0, pan_y0 = 0;  // pan offset when this contact started
+  bool held = false;           // 1:1: a still finger, passed through as a live press
   bool reported = false;       // currently reporting PRESSED to LVGL
 
   int taps = 0;                // consecutive quick taps, for the triple tap
@@ -318,8 +320,14 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
     t.lx = lx;
     t.ly = ly;
     if (view == VIEW_1TO1) {
+      // A finger that moves soon pans; one that stays put becomes a real press, so
+      // press-and-hold gestures (the 10-second hold on the date opens Maintenance)
+      // work here and not only in the scaled view.
       const int dx = lx - t.sx, dy = ly - t.sy;
-      if (!t.panning && (abs(dx) > PAN_SLOP || abs(dy) > PAN_SLOP)) t.panning = true;
+      if (!t.held) {
+        if (!t.panning && (abs(dx) > PAN_SLOP || abs(dy) > PAN_SLOP)) t.panning = true;
+        if (!t.panning && now - t.down_ms >= PRESS_DELAY) t.held = true;
+      }
       if (t.panning) set_pan(t.pan_x0 - dx, t.pan_y0 - dy);
     }
   }
@@ -342,11 +350,12 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
       if (t.taps >= 3) {
         t.taps = 0;
         set_view(view == VIEW_FIT ? VIEW_1TO1 : VIEW_FIT);
-      } else if (view == VIEW_1TO1) {
-        to_canvas(t.lx, t.ly, &t.pt);  // fire the click now that we know it was no pan
+      } else if (view == VIEW_1TO1 && !t.held) {
+        to_canvas(t.lx, t.ly, &t.pt);  // too quick to have become a hold: click it now
         t.click_hold = 2;
       }
     }
+    t.held = false;
   }
 
   if (view == VIEW_FIT) {
@@ -359,8 +368,14 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
     }
     t.reported = report;
   } else {
-    // A drag has to be able to pan, so the click waits for the release.
-    if (t.click_hold > 0) {
+    // A still finger is passed through live, so holds and drags inside a widget work.
+    // A tap too quick for that is replayed as a click once the release proves it was
+    // not the start of a pan.
+    if (t.held) {
+      if (!t.reported) t.accepted++;
+      t.reported = true;
+      to_canvas(t.lx, t.ly, &t.pt);
+    } else if (t.click_hold > 0) {
       if (!t.reported) t.accepted++;
       t.reported = true;
       t.click_hold--;

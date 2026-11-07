@@ -60,9 +60,11 @@ constexpr uint32_t PAN_PCLK_HZ = 20 * 1000 * 1000;
 constexpr int SCR_W = PAN_H, SCR_H = PAN_W;  // 320 x 170
 
 // ---- The two things to check on the first boot -------------------------------------
-// If the picture comes up upside down, flip this. Touch follows it automatically: the
-// touch mapping below is derived from the same constant.
-constexpr bool ROT_FLIP = false;
+// How the panel is mounted. Verified on hardware 2026-11-07: this is the right way up.
+// The maintenance screen's flip is a separate, user-facing setting; the two compose in
+// rot_flip. Touch follows either, being derived from the same flag.
+constexpr bool ROT_BASE = false;
+bool rot_flip = ROT_BASE;
 // This panel is BGR (LovyanGFX calls it rgb_order = false). If the pressure line comes
 // up red and the pain line blue, they are swapped: use ..._ORDER_RGB instead.
 constexpr lcd_rgb_element_order_t PAN_RGB_ORDER = LCD_RGB_ELEMENT_ORDER_BGR;
@@ -108,7 +110,7 @@ int16_t fx0[SCR_W], fx1[SCR_W], fy0[SCR_H], fy1[SCR_H];
 // ---- Presenter ---------------------------------------------------------------------
 // Landscape (lx, ly) -> an index into the native-portrait frame.
 inline int pan_index(int lx, int ly) {
-  return ROT_FLIP ? lx * PAN_W + (PAN_W - 1 - ly) : (PAN_H - 1 - lx) * PAN_W + ly;
+  return rot_flip ? lx * PAN_W + (PAN_W - 1 - ly) : (PAN_H - 1 - lx) * PAN_W + ly;
 }
 
 bool on_trans_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void*) {
@@ -262,7 +264,7 @@ bool btn_pressed(Btn& b, uint32_t now) {
 void rig_banner() {
   log_w("--- T-Display-S3 test rig ---");
   log_w("canvas %dx%d in PSRAM, panel %dx%d (%s), frame buffer in %s", lcd::W, lcd::H, SCR_W,
-        SCR_H, ROT_FLIP ? "flipped" : "normal", canvas_internal ? "internal RAM" : "PSRAM");
+        SCR_H, rot_flip ? "flipped" : "normal", canvas_internal ? "internal RAM" : "PSRAM");
   log_w("touch chip 0x%02X (expect 0xB5 CST816S / 0xB4 CST816T / 0xB6 CST820)", tp_chip);
   log_w("view: %s. Triple tap or KEY switches, BOOT steps the 1:1 window.",
         view == VIEW_FIT ? "scaled" : "1:1");
@@ -299,7 +301,7 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
   }
   // Raw portrait coords -> landscape screen coords (the inverse of pan_index).
   int lx, ly;
-  if (ROT_FLIP) {
+  if (rot_flip) {
     lx = ry;
     ly = PAN_W - 1 - rx;
   } else {
@@ -517,6 +519,13 @@ void set_backlight(uint8_t percent) {
 }
 
 uint8_t backlight() { return bl_percent; }
+
+void set_flipped(bool on) {
+  const bool want = ROT_BASE != on;  // the mount orientation and the setting compose
+  if (want == rot_flip) return;
+  rot_flip = want;
+  present();
+}
 
 void sd_cs_high() {}  // no IO expander and no SD card on this board
 

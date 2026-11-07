@@ -20,6 +20,7 @@ struct Settings {
   uint8_t day_brightness = 100;
   uint8_t night_brightness = 35;
   uint16_t fade_minutes = 30;
+  bool flip_display = false;  // turn the picture and touch 180 degrees
   // Pain analysis parameters
   pain::Params pain;
 

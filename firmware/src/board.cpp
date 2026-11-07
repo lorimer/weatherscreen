@@ -16,6 +16,7 @@ esp_lcd_panel_handle_t panel = nullptr;
 SemaphoreHandle_t lv_mutex = nullptr;
 uint8_t ioex_out = 0xFF;
 uint8_t bl_percent = 100;
+bool flipped = false;
 
 lv_disp_draw_buf_t draw_buf;
 lv_disp_drv_t disp_drv;
@@ -117,8 +118,14 @@ void touch_read_cb(lv_indev_drv_t*, lv_indev_data_t* data) {
     }
   }
 
-  data->point.x = tch.x < lcd::W ? tch.x : lcd::W - 1;
-  data->point.y = tch.y < lcd::H ? tch.y : lcd::H - 1;
+  uint16_t px = tch.x < lcd::W ? tch.x : lcd::W - 1;
+  uint16_t py = tch.y < lcd::H ? tch.y : lcd::H - 1;
+  if (flipped) {
+    px = lcd::W - 1 - px;
+    py = lcd::H - 1 - py;
+  }
+  data->point.x = px;
+  data->point.y = py;
   data->state = tch.reported ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
@@ -155,7 +162,22 @@ bool lcd_init() {
 
 void flush_cb(lv_disp_drv_t* drv, const lv_area_t* a, lv_color_t* px) {
   // RGB panels copy into the frame buffer synchronously.
-  esp_lcd_panel_draw_bitmap(panel, a->x1, a->y1, a->x2 + 1, a->y2 + 1, px);
+  if (flipped) {
+    // A 180 degree turn of a rectangular block is just the pixels in reverse order,
+    // because its rows are contiguous. Doing it here rather than through
+    // esp_lcd_panel_mirror() keeps it working whether or not the RGB driver supports
+    // mirroring, which it does not advertise.
+    const int n = (a->x2 - a->x1 + 1) * (a->y2 - a->y1 + 1);
+    for (int i = 0, j = n - 1; i < j; ++i, --j) {
+      lv_color_t t = px[i];
+      px[i] = px[j];
+      px[j] = t;
+    }
+    esp_lcd_panel_draw_bitmap(panel, lcd::W - 1 - a->x2, lcd::H - 1 - a->y2,
+                              lcd::W - a->x1, lcd::H - a->y1, px);
+  } else {
+    esp_lcd_panel_draw_bitmap(panel, a->x1, a->y1, a->x2 + 1, a->y2 + 1, px);
+  }
   lv_disp_flush_ready(drv);
 }
 
@@ -214,6 +236,12 @@ void set_backlight(uint8_t percent) {
 }
 
 uint8_t backlight() { return bl_percent; }
+
+void set_flipped(bool on) {
+  if (on == flipped) return;
+  flipped = on;
+  lv_obj_invalidate(lv_scr_act());  // nothing cached is valid any more
+}
 
 void sd_cs_high() { ioex_pin(ioex::PIN_SD_CS, true); }
 

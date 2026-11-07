@@ -74,6 +74,7 @@ void route() {
 }  // namespace
 
 void begin() {
+  board::set_flipped(settings::get().flip_display);
   detail::build_main();
   detail::show_boot(route);
 }

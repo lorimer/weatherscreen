@@ -11,6 +11,9 @@ bool begin();
 void set_backlight(uint8_t percent);
 uint8_t backlight();
 
+// Turns the picture and touch 180 degrees, for a unit standing the other way up.
+void set_flipped(bool on);
+
 // Raises the SD card's chip-select line through the expander (needed before SD_MMC).
 void sd_cs_high();
 

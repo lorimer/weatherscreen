@@ -531,10 +531,21 @@ void show_maintenance() {
   lv_obj_add_event_cb(b1, [](lv_event_t*) { wifi_list(); }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* b2 = button(btns, "Change location", col::KEY_ALT, col::TEXT, &atk_b28, 260, 72);
   lv_obj_add_event_cb(b2, [](lv_event_t*) { loc_search(); }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* b3 = button(btns, "Restart", col::KEY_ALT, col::TEXT, &atk_b28, 180, 72);
-  lv_obj_add_event_cb(b3, [](lv_event_t*) { ESP.restart(); }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* b4 = button(btns, "Close", col::ACCENT, 0xFFFFFF, &atk_b28, 180, 72);
-  lv_obj_add_event_cb(b4, to_main_cb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* b3 = button(btns, "Flip display", col::KEY_ALT, col::TEXT, &atk_b28, 220, 72);
+  lv_obj_add_event_cb(b3, [](lv_event_t*) {
+    auto& st = settings::get();
+    st.flip_display = !st.flip_display;
+    settings::save();
+    board::set_flipped(st.flip_display);
+  }, LV_EVENT_CLICKED, nullptr);
+
+  lv_obj_t* btns2 = row(col, 16);
+  lv_obj_set_width(btns2, LV_PCT(100));
+  lv_obj_set_style_pad_top(btns2, 12, 0);
+  lv_obj_t* b4 = button(btns2, "Restart", col::KEY_ALT, col::TEXT, &atk_b28, 180, 72);
+  lv_obj_add_event_cb(b4, [](lv_event_t*) { ESP.restart(); }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* b5 = button(btns2, "Close", col::ACCENT, 0xFFFFFF, &atk_b28, 180, 72);
+  lv_obj_add_event_cb(b5, to_main_cb, LV_EVENT_CLICKED, nullptr);
 
   if (!idle) idle = lv_timer_create(idle_cb, 1000, nullptr);
 }

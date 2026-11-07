@@ -43,6 +43,7 @@ void load() {
   s.day_brightness = prefs.getUChar("bday", 100);
   s.night_brightness = prefs.getUChar("bnight", 35);
   s.fade_minutes = prefs.getUShort("fade", 30);
+  s.flip_display = prefs.getBool("flip", false);
   s.pain.bandwidth_h = prefs.getFloat("p_bw", s.pain.bandwidth_h);
   s.pain.gap_h = prefs.getFloat("p_gap", s.pain.gap_h);
   s.pain.density_window_h = prefs.getFloat("p_dw", s.pain.density_window_h);
@@ -66,6 +67,7 @@ void save() {
   prefs.putUChar("bday", s.day_brightness);
   prefs.putUChar("bnight", s.night_brightness);
   prefs.putUShort("fade", s.fade_minutes);
+  prefs.putBool("flip", s.flip_display);
   prefs.putFloat("p_bw", s.pain.bandwidth_h);
   prefs.putFloat("p_gap", s.pain.gap_h);
   prefs.putFloat("p_dw", s.pain.density_window_h);

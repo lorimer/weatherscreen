@@ -200,7 +200,8 @@ void recompute() {
   int64_t now = now_s();
   int64_t end = now - now % SERIES_STEP_S;
   int64_t start = end - (SERIES_POINTS - 1) * SERIES_STEP_S;
-  // Only the last ~3 days of taps affect the 48 h graph.
+  // Taps older than the window still shape the trend at its left edge (the kernel
+  // reaches +-12 h), so keep two extra days either side of it.
   std::vector<pain::Tap> recent;
   for (auto& t : copy)
     if (t.t >= start - 2 * 86400) recent.push_back(t);

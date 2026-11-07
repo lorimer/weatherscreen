@@ -9,7 +9,7 @@
 
 namespace history {
 
-constexpr int SERIES_POINTS = 97;          // 48 h at 30-minute steps, ending "now"
+constexpr int SERIES_POINTS = 145;         // 72 h at 30-minute steps, ending "now"
 constexpr int64_t SERIES_STEP_S = 1800;
 
 enum class Trend { Unknown, FallingFast, Falling, Steady, Rising, RisingFast };

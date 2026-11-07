@@ -74,7 +74,7 @@ bool fetch(float lat, float lon, Data* out, String* err) {
                "&hourly=pressure_msl"
                "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max"
                "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&timeformat=unixtime"
-               "&past_days=2&forecast_days=5";
+               "&past_days=3&forecast_days=5";  // past_days covers the 72 h history graph
   JsonDocument doc;
   if (!get_json(url, doc, nullptr, err)) return false;
   if (doc["error"] | false) {

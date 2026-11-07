@@ -124,12 +124,15 @@ lv_obj_t* make_chart(lv_obj_t* parent, lv_coord_t w, lv_coord_t h, uint32_t colo
   lv_obj_set_style_bg_color(base, C(col::AXIS), 0);
   lv_obj_set_style_bg_opa(base, LV_OPA_COVER, 0);
   lv_obj_align(base, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-  lv_obj_t* mid = box(ch);
-  lv_obj_add_flag(mid, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
-  lv_obj_set_size(mid, 2, h - 12);
-  lv_obj_set_style_bg_color(mid, C(col::MIDLINE), 0);
-  lv_obj_set_style_bg_opa(mid, LV_OPA_COVER, 0);
-  lv_obj_align(mid, LV_ALIGN_TOP_MID, 0, 0);
+  // Day boundaries: the window is 3 days, so mark 2 days ago and 1 day ago.
+  for (int d = 1; d <= 2; ++d) {
+    lv_obj_t* grid = box(ch);
+    lv_obj_add_flag(grid, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_size(grid, 2, h - 12);
+    lv_obj_set_style_bg_color(grid, C(col::MIDLINE), 0);
+    lv_obj_set_style_bg_opa(grid, LV_OPA_COVER, 0);
+    lv_obj_align(grid, LV_ALIGN_TOP_LEFT, (w - 12) * d / 3, 0);
+  }
   *ser = lv_chart_add_series(ch, C(color), LV_CHART_AXIS_PRIMARY_Y);
   lv_chart_set_all_value(ch, *ser, LV_CHART_POINT_NONE);
   // "Now" dot on the last point.
@@ -361,7 +364,7 @@ void build_main() {
   lv_obj_set_width(ax, 256);
   lv_obj_set_style_pad_top(ax, 0, 0);
   lv_obj_set_flex_align(ax, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  label(ax, &atk_r20, col::MUTED, "2 days ago");
+  label(ax, &atk_r20, col::MUTED, "3 days ago");
   label(ax, &atk_r20, col::MUTED, "Now");
 
   lv_obj_t* d2 = box(root);

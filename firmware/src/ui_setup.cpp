@@ -510,6 +510,7 @@ void show_maintenance() {
   info_line(info, "Device", s.device_name);
   mi_addr = info_line(info, "IP address", address_text(), &atk_b28);
   info_line(info, "Web page", "http://" + settings::hostname() + ".local");
+  info_line(info, "User name", "admin");
   mi_wifi = info_line(info, "Wi-Fi", net::connected() ? s.ssid : String("not connected"));
   mi_signal = info_line(info, "Signal", signal_text());
   info_line(info, "Location", s.place.length() ? s.place : String("not set"));

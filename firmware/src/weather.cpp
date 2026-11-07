@@ -16,6 +16,12 @@ bool get_json(const String& url, JsonDocument& doc, const JsonDocument* filter, 
   HTTPClient http;
   http.setTimeout(15000);
   http.setUserAgent("WeatherPainStation/" FW_VERSION);
+  // The forecast endpoint answers with Transfer-Encoding: chunked, and getStream() hands
+  // back the raw socket, so the chunk-size lines reach the parser and it fails with
+  // InvalidInput. Asking for HTTP/1.0 drops chunked encoding and keeps the body
+  // streamable, so we never have to hold it all in RAM. (The geocoding endpoint sends a
+  // Content-Length and worked either way, which is why only the forecast was broken.)
+  http.useHTTP10(true);
   if (!http.begin(client, url)) {
     if (err) *err = "connect failed";
     return false;

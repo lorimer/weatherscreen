@@ -217,6 +217,12 @@ python3 tools/analyze.py pain.csv pressure.csv --utc-offset -7 --plot chart.png
   section). The section id is `trends`.
 - `git clone` of a bundle with no HEAD gives an empty checkout. Use `-b main`.
 - In the host-renderer Arduino shim, min/max must return by value (not a reference).
+- **Open-Meteo's forecast endpoint answers with `Transfer-Encoding: chunked`**, and
+  HTTPClient's `getStream()` hands back the raw socket, so chunk-size lines reach
+  ArduinoJson and it fails with `InvalidInput`. `http.useHTTP10(true)` drops chunked
+  encoding and keeps the body streamable. The geocoding endpoint sends a Content-Length,
+  so it always worked -- which is why location search succeeded while the dashboard
+  stayed empty. Found on hardware 2026-11-07; it would have failed on the 7B too.
 - The PlatformIO registry was blocked in the original sandbox, so libraries come from
   GitHub URLs in platformio.ini (LVGL v8.3.11, ArduinoJson v7.4.2). That works anywhere.
 

@@ -45,6 +45,10 @@ constexpr uint32_t WEATHER_REFRESH_MS = 15UL * 60 * 1000;
 constexpr uint32_t WEATHER_RETRY_MS = 60UL * 1000;
 constexpr uint32_t SENSOR_READ_MS = 60UL * 1000;          // read every minute (display)
 constexpr uint32_t SENSOR_LOG_MS = 10UL * 60 * 1000;      // log every 10 minutes
+// Without a sensor, pressure comes from the forecast. Log it on the same 30-minute grid
+// the history graph is drawn on. Storage is not the constraint: a row is about 36 bytes,
+// so this is ~1.7 kB a day, under 650 kB a year, on a card with gigabytes spare.
+constexpr uint32_t API_PRESSURE_LOG_S = 30UL * 60;
 constexpr uint32_t ANALYSIS_DEBOUNCE_MS = 3000;
 constexpr uint32_t ANALYSIS_PERIOD_MS = 10UL * 60 * 1000;
 constexpr uint32_t AP_FALLBACK_AFTER_MS = 30UL * 60 * 1000;

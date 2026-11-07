@@ -188,12 +188,17 @@ void add_sensor_reading(int64_t t, float station, float temp_c, float hum, bool 
 }
 
 void log_api_pressure_if_no_sensor(int64_t t) {
-  // Without a sensor, keep an hourly record of the internet pressure so long-term
-  // correlation still works.
+  // Without a sensor, keep a record of the internet pressure every 30 minutes so
+  // long-term correlation still works. The forecast's own pressure resolution is
+  // hourly, so some consecutive rows repeat a value; that costs nothing and means no
+  // movement is missed when the API does update sooner.
   Lock l;
   if (latest_local.t && t - latest_local.t < 3600) return;
   if (std::isnan(wx.pressure_hpa)) return;
-  if (!psamples.empty() && t - psamples.back().t < 3300) return;
+  // One slot per 30 minutes, so the log lines up with the graph and a late run does not
+  // push the next sample out.
+  const int64_t slot_s = (int64_t)timing::API_PRESSURE_LOG_S;
+  if (!psamples.empty() && t / slot_s == psamples.back().t / slot_s) return;
   psamples.push_back({t, wx.pressure_hpa});
   storage::append_pressure(t, NAN, wx.pressure_hpa, NAN, NAN);
 }

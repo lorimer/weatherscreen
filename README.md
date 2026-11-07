@@ -1,9 +1,41 @@
 # Weather & Pain Station
 
-A 7" tabletop weather display for an elderly user. It shows the internet forecast,
-logs barometric pressure, and has five always-visible buttons for logging pain (1-5)
-with a single tap. The pain scores are cleaned up statistically and compared with
-pressure changes. It is maintained remotely through a web page and over-the-air updates.
+A 7" tabletop weather display built for an elderly user. It needs no menus and only one
+gesture: tap a number.
+
+![Main screen](docs/1_main.png)
+
+## Summary
+
+- **Big, readable weather.** Current conditions and a 3-day forecast from Open-Meteo
+  (free, no API key), in large Atkinson Hyperlegible type on a light, high-contrast screen.
+- **Barometric pressure history.** A BME280 sensor logs pressure every 10 minutes, shown
+  as a 48-hour graph with a rising or falling trend.
+- **One-tap pain logging.** Five always-visible buttons (1 = least, 5 = worst). A tap logs
+  the score and shows a check mark for a second. There are no screens to get lost in.
+- **Forgiving statistics.** Mis-taps, bursts of repeated taps and irregular use are
+  handled in the analysis, not by the user. The screen shows a smoothed pain trend under
+  the pressure graph, and the web page correlates pain with pressure changes.
+- **Hands-off maintenance.** A password-protected web page, over-the-air updates with
+  automatic rollback, a fallback hotspot if Wi-Fi is lost, and dimming at sunset.
+- **Printable case.** A tabletop stand at an 18° tilt holds the glass flush with the front,
+  with a ballast well and a vented sensor pocket.
+
+| Tap feedback | First-time setup | Maintenance (hold the date 10 s) |
+|---|---|---|
+| ![Tap feedback](docs/2_main_tap_feedback.png) | ![Wi-Fi setup](docs/5_setup_wifi_password.png) | ![Maintenance](docs/6_maintenance.png) |
+
+| Case, front | Case, side | Case, back |
+|---|---|---|
+| ![Case front](docs/preview_front.png) | ![Case side](docs/preview_side.png) | ![Case back](docs/preview_back.png) |
+
+The screenshots are rendered on a PC from the real firmware UI code, using sample data
+(see `firmware/test/host`).
+
+**Hardware:** Waveshare ESP32-S3-Touch-LCD-7B (1024x600), a BME280, a microSD card and a
+USB-C power supply. The parts list is in section 1 below.
+
+## Repository layout
 
 ```
 firmware/   PlatformIO project (Arduino-ESP32 3.3 + LVGL 8.3)

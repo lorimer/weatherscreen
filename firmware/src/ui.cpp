@@ -65,10 +65,17 @@ void update_overlay() {
 
 }  // namespace
 
-void begin() {
-  detail::build_main();
+namespace {
+// Where the boot screen hands over once its reveal has finished.
+void route() {
   if (!settings::get().setup_done()) show_setup_first_time();
   else show_main();
+}
+}  // namespace
+
+void begin() {
+  detail::build_main();
+  detail::show_boot(route);
 }
 
 void loop() {

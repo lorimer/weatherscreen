@@ -17,6 +17,7 @@ void post_updating(bool on);   // OTA in progress overlay
 
 // Internal (shared between ui_main.cpp and ui_setup.cpp)
 namespace detail {
+void show_boot(void (*done)());   // ui_boot.cpp; calls done() when the reveal ends
 void build_main();
 void refresh_main(bool force);
 void tick_clock();

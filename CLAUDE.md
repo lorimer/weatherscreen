@@ -14,6 +14,10 @@ so pain can be correlated with pressure changes. Family members maintain it remo
 Spec doc (Claude Docs artifact, may be out of date in small details):
 https://claude.ai/artifact/SgFygNMMvvXpWQ6WgSL6Pc
 Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsStMi68Cq138KQC3gu2n
+Logo and boot screen (Claude Design canvas "Old Man Weather - Logo"):
+https://claude.ai/artifact/3aJ42WvrSd87xt9uVHgQEn -- four static artboards, no animation.
+Direction A (cloud gent) is the chosen one; its Boot artboard is exported to
+`docs/boot_screen_reference.png` and reproduced in firmware by `tools/gen_logo.py`.
 
 ## Status (as of v1.2.0, 2026-11-07)
 

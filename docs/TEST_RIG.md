@@ -54,9 +54,14 @@ touch at I2C 0x15. All of it is in `firmware/src/board_tdisplay.cpp`, which repl
 
 The panel keeps its **native portrait** scan order, with the column gap of 35 set on the
 controller, and the landscape rotation is done in the presenter. That keeps MADCTL out
-of it: there is one `ROT_FLIP` constant to flip if the picture comes up upside down
-(touch follows it automatically, since the touch mapping is derived from the same
-constant).
+of it: there is one `ROT_BASE` constant for how the panel is mounted (touch follows it
+automatically, since the touch mapping is derived from the same flag), and the
+user-facing 180-degree flip on the Maintenance screen composes with it.
+
+Colour order is `LCD_RGB_ELEMENT_ORDER_RGB`. LovyanGFX's `rgb_order = false` for this
+panel reads as BGR, but that is the opposite polarity to esp_lcd's `rgb_ele_order`, so
+copying it across swaps red and blue. The symptom is subtle because green is the
+untouched channel: a green-to-red ramp appears green-to-blue, and only the ends move.
 
 A BME280 wired to **GPIO 18 (SDA) / 17 (SCL)** — the touch bus — would be found at 0x76
 or 0x77 as usual and logged for real.

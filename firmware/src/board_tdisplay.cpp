@@ -65,9 +65,11 @@ constexpr int SCR_W = PAN_H, SCR_H = PAN_W;  // 320 x 170
 // rot_flip. Touch follows either, being derived from the same flag.
 constexpr bool ROT_BASE = false;
 bool rot_flip = ROT_BASE;
-// This panel is BGR (LovyanGFX calls it rgb_order = false). If the pressure line comes
-// up red and the pain line blue, they are swapped: use ..._ORDER_RGB instead.
-constexpr lcd_rgb_element_order_t PAN_RGB_ORDER = LCD_RGB_ELEMENT_ORDER_BGR;
+// RGB, confirmed on hardware 2026-11-07. It was set to BGR first, read across from
+// LovyanGFX's rgb_order = false, which turns out to be the opposite polarity to
+// esp_lcd's rgb_ele_order. The giveaway was a green-to-red ramp appearing green to
+// blue: exchanging R and B leaves green alone, so only the ends move.
+constexpr lcd_rgb_element_order_t PAN_RGB_ORDER = LCD_RGB_ELEMENT_ORDER_RGB;
 
 // ---- State -------------------------------------------------------------------------
 esp_lcd_panel_io_handle_t io = nullptr;

@@ -8,7 +8,6 @@
 #include "sensor.h"
 #include "settings.h"
 #include "storage.h"
-#include "testrig.h"
 #include "trends.h"
 
 namespace history {
@@ -148,29 +147,12 @@ void begin() {
 void add_tap(int score) {
   int64_t t = now_s();
   if (!clock_ok()) t = 0;  // no clock yet: still record, flagged by t=0 (ignored on reload)
-#ifdef BOARD_TDISPLAY_S3
-  if (t) t = testrig::tap_time(t);  // test rig: optional time dilation
-#endif
   storage::append_pain(t, score);
   Lock l;
   if (t) taps.push_back({t, (float)score});
   dirty_taps = true;
 }
 
-#ifdef BOARD_TDISPLAY_S3
-void add_tap_at(int64_t t, int score) {
-  storage::append_pain(t, score);
-  Lock l;
-  taps.push_back({t, (float)score});  // analyze() sorts, so order does not matter
-  dirty_taps = true;
-}
-
-void clear_taps() {
-  Lock l;
-  taps.clear();
-  dirty_taps = true;
-}
-#endif
 
 void add_sensor_reading(int64_t t, float station, float temp_c, float hum, bool log_it) {
   const auto& s = settings::get();

@@ -15,10 +15,15 @@ Spec doc (Claude Docs artifact, may be out of date in small details):
 https://claude.ai/artifact/SgFygNMMvvXpWQ6WgSL6Pc
 Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsStMi68Cq138KQC3gu2n
 
-## Status (as of v1.1.0, 2026-11-07)
+## Status (as of v1.2.0, 2026-11-07)
 
-- **Never run on real hardware yet.** Everything was verified off-device:
-  - the firmware compiles (PlatformIO, about 36 % of the 6.25 MB app slot);
+- **Never run on the Waveshare 7B yet**, but no longer never run at all. The firmware
+  was brought up on a LilyGO T-Display-S3 (a 320x170 panel) as a temporary rig, with
+  the real 1024x600 UI rendered into a PSRAM canvas and shown scaled. That rig is
+  removed again; see "What the hardware bring-up found" below for what it proved, and
+  the `tdisplay-s3` branch history for how it worked.
+- Verified off-device:
+  - the firmware compiles (PlatformIO, about 39 % of the 6.25 MB app slot);
   - the analysis has host unit tests (`test_pain.cpp`, `test_trends.cpp`), and the
     Python port in `tools/analyze.py` matches the C++ exactly;
   - the screens were rendered from the real LVGL code on a PC (`firmware/test/host`);
@@ -26,11 +31,21 @@ Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsS
   - the case was checked for collisions against Waveshare's STEP model.
 - Next step on the user's side: buy parts, print, flash, and work through the
   first-power-on checklist in README §6.
-- **Test rig (branch `tdisplay-s3`)**: `env:tdisplay` runs the same firmware on a LilyGO
-  T-Display-S3 Touch (320x170). The real 1024x600 UI renders into a PSRAM canvas and is
-  shown scaled down, or 1:1 with drag-to-pan. It exercises the real UI, touch, network,
-  analysis and web code; it says nothing about the RGB panel, GT911, SD or BME280.
-  See docs/TEST_RIG.md. Nothing in this port should reach the Waveshare build.
+
+### What the hardware bring-up found (2026-11-07)
+
+Running on a real ESP32-S3 found three things that no amount of off-device checking had:
+
+1. **The forecast never parsed.** Open-Meteo sends the forecast chunked; see the gotcha
+   below. The screen would have been permanently empty on the 7B too.
+2. **The pain trend was not smooth.** Three discontinuities in the estimator put jumps
+   of over 2 points (on a 1-5 scale) between adjacent 30-minute samples. Fixed; see the
+   algorithm notes.
+3. **Press-and-hold and colour order** were rig-specific and went with the rig.
+
+The lesson worth keeping: the off-device checks all passed while the product did not
+work. Compiling, unit tests, host-rendered screens and a mocked web page between them
+missed a dead network path and a visibly broken graph.
 
 ## Requirements the user gave (keep these; they were explicit)
 
@@ -55,10 +70,13 @@ Approved screen mockup (Claude Design artifact): https://claude.ai/artifact/RAsS
 
 **Layout (user-specified, approved in the mockup)**
 - Left ~600 px: current weather + 3-day forecast.
-- Middle ~300 px: pressure (value, trend, 48 h graph) with the pain **trend line** below
-  it, stacked on a shared time axis, evenly spaced vertically.
+- Middle ~300 px: pressure (value, trend, 72 h graph) with the pain **trend line** below
+  it, stacked on a shared time axis, evenly spaced vertically. The user asked for 3 days
+  on both, with day gridlines (2026-11-07).
 - Right ~122 px: five always-visible pain buttons, 5 (top, "Worst") to 1 (bottom,
-  "Least"), coloured green to red, with numbers.
+  "Least"), with numbers. Coloured **blue (1) to red (5)**: the user changed this from
+  green-to-red on 2026-11-07. Red/green is the pair most often confused, and the ramp
+  also steps in lightness so it reads without colour at all.
 - The pain history is shown as a **line** of calculated values, never individual points.
 
 **Pain analysis (user's statistical requirements)**
@@ -98,9 +116,8 @@ firmware/src/
   config.h        pins, panel timing, IO-expander bits, colours (match the mockup)
   board.*         I2C (Wire on 8/9), IO expander, RGB panel (esp_lcd), GT911 touch +
                   invisible touch filter, LVGL glue, backlight
-  board_tdisplay.cpp  same board:: API for the T-Display-S3 test rig (env tdisplay);
-                  replaces board.cpp. See docs/TEST_RIG.md
   ui.*            routing, sunrise/sunset dimming, OTA overlay
+  ui_boot.cpp     boot screen: the Old Man Weather mark, then the wordmark bar
   ui_main.cpp     main screen (the layout above); pain buttons fire on PRESSED
   ui_setup.cpp    first-time wizard, maintenance menu, custom on-screen keyboard
   ui_common.h     LVGL helpers
@@ -115,7 +132,7 @@ firmware/src/
   pain.*          pain analysis (plain C++, host-tested)
   trends.*        long-term aggregates (plain C++, host-tested)
   settings.*      NVS-backed settings
-  fonts/ icons/   generated (tools/gen_fonts.sh, tools/gen_icons.py)
+  fonts/ icons/   generated (tools/gen_fonts.sh, tools/gen_icons.py, tools/gen_logo.py)
 firmware/test/    test_pain.cpp, test_trends.cpp, host/ (screen renderer), web/ (mock API + Playwright)
 case/case.py      CadQuery: front_tray + stand; --check runs a clearance check vs the STEP
 tools/analyze.py  Python port of the analysis (verified identical output)

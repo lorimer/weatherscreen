@@ -1,0 +1,7 @@
+firmware/.pio/
+firmware/test/host/obj/
+firmware/test/host/render
+firmware/test/host/out/
+tools/node_modules/
+tools/fonts/
+case/__pycache__/

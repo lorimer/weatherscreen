@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Draws the weather and trend icons and writes them as LVGL 8 image arrays.
+
+Icons are rendered at 8x and downsampled for clean anti-aliasing, directly onto the
+screen background colour (the screen never changes colour; night only dims the
+backlight), so they are stored as plain RGB565 with no alpha channel.
+
+Usage:  python3 gen_icons.py            (writes ../firmware/src/icons/icons.c/.h)
+Needs:  pip install pillow
+"""
+from pathlib import Path
+from PIL import Image, ImageDraw
+
+BG = (0xF6, 0xF3, 0xEC)
+SUN, SUN_RAY = (0xF2, 0xB2, 0x32), (0xE3, 0x9A, 0x12)
+MOON = (0xD9, 0xB4, 0x4A)
+CLOUD_LIGHT, CLOUD, CLOUD_DARK = (0xB9, 0xBE, 0xC7), (0x8E, 0x95, 0xA1), (0x6B, 0x72, 0x80)
+RAIN, SNOW = (0x2B, 0x5F, 0x9E), (0x6F, 0x9F, 0xD8)
+FALL, RISE, STEADY = (0xA8, 0x4B, 0x0C), (0x2B, 0x5F, 0x9E), (0x5A, 0x56, 0x4E)
+
+SS = 8  # supersampling factor
+OUT = Path(__file__).resolve().parent.parent / "firmware" / "src" / "icons"
+
+
+class Pen:
+    """Draws in a 64-unit coordinate space scaled to the target size."""
+
+    def __init__(self, size):
+        self.size = size
+        self.k = size * SS / 64.0
+        self.img = Image.new("RGB", (size * SS, size * SS), BG)
+        self.d = ImageDraw.Draw(self.img)
+
+    def p(self, *xy):
+        return [v * self.k for v in xy]
+
+    def circle(self, cx, cy, r, fill):
+        self.d.ellipse(self.p(cx - r, cy - r, cx + r, cy + r), fill=fill)
+
+    def line(self, x1, y1, x2, y2, w, fill):
+        self.d.line(self.p(x1, y1, x2, y2), fill=fill, width=max(1, round(w * self.k)))
+        r = w / 2  # round caps
+        self.circle(x1, y1, r, fill)
+        self.circle(x2, y2, r, fill)
+
+    def rrect(self, x1, y1, x2, y2, r, fill):
+        self.d.rounded_rectangle(self.p(x1, y1, x2, y2), radius=r * self.k, fill=fill)
+
+    def poly(self, pts, fill):
+        self.d.polygon([v * self.k for xy in pts for v in xy], fill=fill)
+
+    def done(self):
+        return self.img.resize((self.size, self.size), Image.LANCZOS)
+
+
+def sun(pen, cx=32, cy=32, r=13, rays=True):
+    pen.circle(cx, cy, r, SUN)
+    if rays:
+        import math
+        for i in range(8):
+            a = math.pi / 4 * i
+            r1, r2 = r + 6, r + 13
+            pen.line(cx + r1 * math.cos(a), cy + r1 * math.sin(a),
+                     cx + r2 * math.cos(a), cy + r2 * math.sin(a), 4, SUN_RAY)
+
+
+def moon(pen, cx=32, cy=32, r=16):
+    pen.circle(cx, cy, r, MOON)
+    pen.circle(cx + r * 0.55, cy - r * 0.35, r * 0.85, BG)
+
+
+def cloud(pen, color, dx=0.0, dy=0.0, s=1.0):
+    def c(x, y, r):
+        pen.circle(dx + x * s, dy + y * s, r * s, color)
+    pen.rrect(dx + 12 * s, dy + 36 * s, dx + 58 * s, dy + 52 * s, 8 * s, color)
+    c(24, 40, 10)
+    c(37, 32, 14)
+    c(49, 40, 10)
+
+
+def make(name, size):
+    pen = Pen(size)
+    if name == "clear_day":
+        sun(pen)
+    elif name == "clear_night":
+        moon(pen)
+    elif name == "partly_day":
+        sun(pen, 24, 22, 10, rays=True)
+        cloud(pen, CLOUD_LIGHT, dx=2, dy=6, s=0.95)
+    elif name == "partly_night":
+        moon(pen, 24, 22, 12)
+        cloud(pen, CLOUD_LIGHT, dx=2, dy=6, s=0.95)
+    elif name == "cloudy":
+        cloud(pen, CLOUD_LIGHT, dx=-6, dy=-8, s=0.85)
+        cloud(pen, CLOUD, dx=2, dy=4, s=0.95)
+    elif name == "fog":
+        cloud(pen, CLOUD_LIGHT, dx=0, dy=-8, s=1.0)
+        for y, x1, x2 in ((50, 10, 54), (57, 16, 58)):
+            pen.line(x1, y, x2, y, 4, CLOUD)
+    elif name == "drizzle":
+        cloud(pen, CLOUD, dx=0, dy=-10, s=1.0)
+        for x in (22, 33, 44):
+            pen.circle(x, 52, 2.6, RAIN)
+            pen.circle(x - 3, 59, 2.6, RAIN)
+    elif name == "rain":
+        cloud(pen, CLOUD, dx=0, dy=-10, s=1.0)
+        for x in (22, 33, 44):
+            pen.line(x, 48, x - 4, 59, 4, RAIN)
+    elif name == "snow":
+        cloud(pen, CLOUD_LIGHT, dx=0, dy=-10, s=1.0)
+        for x, y in ((20, 51), (32, 56), (44, 51), (26, 60), (38, 60)):
+            pen.circle(x, y, 3, SNOW)
+    elif name == "thunder":
+        cloud(pen, CLOUD_DARK, dx=0, dy=-10, s=1.0)
+        pen.poly([(34, 40), (24, 54), (31, 54), (27, 63), (40, 48), (33, 48), (37, 40)], SUN)
+    elif name.startswith("arrow_"):
+        col = {"arrow_down": FALL, "arrow_up": RISE, "arrow_right": STEADY}[name]
+        w = 7
+        if name == "arrow_down":
+            pen.line(32, 8, 32, 52, w, col); pen.line(14, 36, 32, 54, w, col); pen.line(50, 36, 32, 54, w, col)
+        elif name == "arrow_up":
+            pen.line(32, 56, 32, 12, w, col); pen.line(14, 28, 32, 10, w, col); pen.line(50, 28, 32, 10, w, col)
+        else:
+            pen.line(8, 32, 52, 32, w, col); pen.line(36, 14, 54, 32, w, col); pen.line(36, 50, 54, 32, w, col)
+    else:
+        raise ValueError(name)
+    return pen.done()
+
+
+def rgb565(r, g, b):
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+
+
+def emit(images):
+    OUT.mkdir(parents=True, exist_ok=True)
+    c = ['// Generated by tools/gen_icons.py. Do not edit.', '#include "icons.h"', '']
+    h = ['// Generated by tools/gen_icons.py. Do not edit.', '#pragma once', '#include <lvgl.h>', '']
+    for sym, img in images:
+        w, hgt = img.size
+        data = []
+        for r, g, b in img.getdata():
+            v = rgb565(r, g, b)
+            data += [v & 0xFF, v >> 8]  # little-endian, LV_COLOR_16_SWAP = 0
+        c.append(f"static const uint8_t {sym}_map[] = {{")
+        for i in range(0, len(data), 24):
+            c.append("  " + ",".join(f"0x{x:02X}" for x in data[i:i + 24]) + ",")
+        c.append("};")
+        c.append(f"const lv_img_dsc_t {sym} = {{")
+        c.append(f"  .header = {{ .cf = LV_IMG_CF_TRUE_COLOR, .always_zero = 0, .reserved = 0, .w = {w}, .h = {hgt} }},")
+        c.append(f"  .data_size = {len(data)},")
+        c.append(f"  .data = {sym}_map,")
+        c.append("};\n")
+        h.append(f"extern const lv_img_dsc_t {sym};")
+    (OUT / "icons.c").write_text("\n".join(c) + "\n")
+    (OUT / "icons.h").write_text("\n".join(h) + "\n")
+
+
+if __name__ == "__main__":
+    names = ["clear_day", "clear_night", "partly_day", "partly_night", "cloudy",
+             "fog", "drizzle", "rain", "snow", "thunder"]
+    imgs = []
+    preview = Image.new("RGB", (len(names) * 140, 140 + 72 + 40), BG)
+    for i, n in enumerate(names):
+        big, small = make(n, 132), make(n, 64)
+        imgs += [(f"ic_{n}_132", big), (f"ic_{n}_64", small)]
+        preview.paste(big, (i * 140 + 4, 4))
+        preview.paste(small, (i * 140 + 38, 144))
+    for j, n in enumerate(["arrow_down", "arrow_up", "arrow_right"]):
+        a = make(n, 28)
+        imgs.append((f"ic_{n}", a))
+        preview.paste(a, (j * 40 + 4, 220))
+    emit(imgs)
+    preview.save(Path(__file__).resolve().parent / "icons_preview.png")
+    print(f"wrote {len(imgs)} images to {OUT}")

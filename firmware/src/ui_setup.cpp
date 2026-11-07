@@ -402,6 +402,44 @@ void loc_search() {
   text_entry(col, "City or ZIP code for the forecast", "", "Search", loc_go, loc_back);
 }
 
+// Signal strength in words first: dBm means nothing to most people reading this screen.
+String signal_text() {
+  if (!net::connected()) return "not connected";
+  const int r = net::rssi();
+  const char* q = r >= -55 ? "excellent" : r >= -65 ? "good" : r >= -75 ? "fair"
+                                                             : r >= -85 ? "weak" : "very weak";
+  return String(q) + "  (" + String(r) + " dBm)";
+}
+
+// The lines on the maintenance screen that go out of date while it is open.
+lv_obj_t* mi_addr = nullptr;
+lv_obj_t* mi_wifi = nullptr;
+lv_obj_t* mi_signal = nullptr;
+lv_obj_t* mi_weather = nullptr;
+lv_obj_t* mi_taps = nullptr;
+lv_obj_t* done_addr = nullptr;
+
+void clear_live_labels() {
+  mi_addr = mi_wifi = mi_signal = mi_weather = mi_taps = done_addr = nullptr;
+}
+
+String address_text() {
+  const String ip = net::ip();
+  if (ip == "-") return "waiting for Wi-Fi...";
+  return net::ap_active() && !net::connected() ? ip + "  (hotspot)" : ip;
+}
+
+void live_info_cb(lv_timer_t*) {
+  if (mi_addr) lv_label_set_text(mi_addr, address_text().c_str());
+  if (mi_wifi) lv_label_set_text(mi_wifi, net::connected() ? settings::get().ssid.c_str()
+                                                           : "not connected");
+  if (mi_signal) lv_label_set_text(mi_signal, signal_text().c_str());
+  if (mi_weather) lv_label_set_text(mi_weather, net::weather_ok() ? "OK"
+                                                : net::last_weather_error().c_str());
+  if (mi_taps) lv_label_set_text(mi_taps, String((unsigned)history::tap_count()).c_str());
+  if (done_addr) lv_label_set_text(done_addr, ("or  http://" + address_text()).c_str());
+}
+
 // ---------------------------------------------------------------- maintenance password
 void admin_go() {
   String p = lv_textarea_get_text(ta);
@@ -428,9 +466,11 @@ void done_screen() {
   String host = settings::hostname();
   label(body, &atk_r30, col::TEXT, "The station is ready.");
   label(body, &atk_r28, col::TEXT2, ("Web page:  http://" + host + ".local").c_str());
-  label(body, &atk_r28, col::TEXT2, ("or  http://" + net::ip()).c_str());
+  clear_live_labels();
+  done_addr = label(body, &atk_r28, col::TEXT2, ("or  http://" + address_text()).c_str());
   label(body, &atk_r28, col::TEXT2, "User name: admin");
   label(body, &atk_r24, col::MUTED, "To reopen settings later, hold the date at the top for 10 seconds.");
+  poll = lv_timer_create(live_info_cb, 1000, nullptr);  // cleared by the next show()
   lv_obj_t* gap = box(col);
   lv_obj_set_height(gap, 20);
   lv_obj_t* b = button(col, "Start", col::ACCENT, 0xFFFFFF, &atk_b30, 260, 72);
@@ -439,12 +479,14 @@ void done_screen() {
 }
 
 // ---------------------------------------------------------------- maintenance menu
-void info_line(lv_obj_t* parent, const char* k, const String& v) {
+lv_obj_t* info_line(lv_obj_t* parent, const char* k, const String& v,
+                    const lv_font_t* font = &atk_r24) {
   lv_obj_t* r = row(parent, 12);
   lv_obj_t* kl = label(r, &atk_b22, col::MUTED, k);
   lv_obj_set_width(kl, 200);
-  label(r, &atk_r24, col::TEXT, v.c_str());
+  return label(r, font, col::TEXT, v.c_str());
 }
+
 
 }  // namespace
 
@@ -464,19 +506,22 @@ void show_maintenance() {
   auto& s = settings::get();
   lv_obj_t* info = column(col, 8);
   lv_obj_set_style_pad_top(info, 6, 0);
+  clear_live_labels();
   info_line(info, "Device", s.device_name);
-  info_line(info, "Web page", "http://" + settings::hostname() + ".local   (" + net::ip() + ")");
-  info_line(info, "Wi-Fi", net::connected() ? s.ssid + "  (" + String(net::rssi()) + " dBm)"
-                                            : String("not connected") + (net::ap_active() ? ", hotspot " + net::ap_name() : ""));
+  mi_addr = info_line(info, "IP address", address_text(), &atk_b28);
+  info_line(info, "Web page", "http://" + settings::hostname() + ".local");
+  mi_wifi = info_line(info, "Wi-Fi", net::connected() ? s.ssid : String("not connected"));
+  mi_signal = info_line(info, "Signal", signal_text());
   info_line(info, "Location", s.place.length() ? s.place : String("not set"));
-  info_line(info, "Weather", net::weather_ok() ? String("OK") : net::last_weather_error());
+  mi_weather = info_line(info, "Weather", net::weather_ok() ? String("OK") : net::last_weather_error());
   info_line(info, "Sensor", String(sensor::chip_name()));
   char st[64];
   snprintf(st, sizeof st, "%s, %llu of %llu MB used", storage::medium(),
            (unsigned long long)(storage::used_bytes() >> 20), (unsigned long long)(storage::total_bytes() >> 20));
   info_line(info, "Storage", st);
-  info_line(info, "Pain taps", String((unsigned)history::tap_count()));
+  mi_taps = info_line(info, "Pain taps", String((unsigned)history::tap_count()));
   info_line(info, "Firmware", FW_VERSION);
+  poll = lv_timer_create(live_info_cb, 1000, nullptr);  // cleared by the next show()
 
   lv_obj_t* btns = row(col, 16);
   lv_obj_set_width(btns, LV_PCT(100));

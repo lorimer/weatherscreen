@@ -1,4 +1,4 @@
-// Weather & Pain Station
+// Old Man Weather
 // Waveshare ESP32-S3-Touch-LCD-7B + BME280. See README.md.
 //
 // Core 1 (Arduino loop): LVGL screen and touch.
@@ -27,7 +27,7 @@ bool marked_valid = false;
 
 void setup() {
   Serial.begin(115200);
-  log_i("Weather & Pain Station %s", FW_VERSION);
+  log_i("Old Man Weather %s", FW_VERSION);
 
   // Watchdog: reboot if the UI or network task hangs for 30 s.
   esp_task_wdt_config_t wdt = {.timeout_ms = 30000, .idle_core_mask = 0, .trigger_panic = true};

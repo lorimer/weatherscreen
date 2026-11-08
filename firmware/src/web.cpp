@@ -26,7 +26,7 @@ String upload_err;
 bool auth() {
   const auto& p = settings::get().admin_pass;
   if (p.length() >= 8 && server.authenticate("admin", p.c_str())) return true;
-  server.requestAuthentication(BASIC_AUTH, "Weather & Pain Station");
+  server.requestAuthentication(BASIC_AUTH, "Old Man Weather");
   return false;
 }
 

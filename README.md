@@ -1,4 +1,4 @@
-# Weather & Pain Station
+# Old Man Weather
 
 A 7" tabletop weather display built for an elderly user. It needs no menus and only one
 gesture: tap a number.
@@ -10,9 +10,11 @@ gesture: tap a number.
 - **Big, readable weather.** Current conditions and a 3-day forecast from Open-Meteo
   (free, no API key), in large Atkinson Hyperlegible type on a light, high-contrast screen.
 - **Barometric pressure history.** A BME280 sensor logs pressure every 10 minutes, shown
-  as a 48-hour graph with a rising or falling trend.
-- **One-tap pain logging.** Five always-visible buttons (1 = least, 5 = worst). A tap logs
-  the score and shows a check mark for a second. There are no screens to get lost in.
+  as a 3-day graph with a rising or falling trend, on the same time axis as the pain
+  trend below it.
+- **One-tap pain logging.** Five always-visible buttons, blue (1 = least) to red
+  (5 = worst). A tap logs the score and shows a check mark for a second. There are no
+  screens to get lost in.
 - **Forgiving statistics.** Mis-taps, bursts of repeated taps and irregular use are
   handled in the analysis, not by the user. The screen shows a smoothed pain trend under
   the pressure graph, and the web page correlates pain with pressure changes.
@@ -48,14 +50,19 @@ USB-C power supply. The parts list is in section 1 below.
 ```
 firmware/   PlatformIO project (Arduino-ESP32 3.3 + LVGL 8.3)
 case/       Parametric CadQuery case: front tray + stand (STL/STEP in case/out)
-tools/      analyze.py (re-run the analysis on a PC), font/icon generators
-docs/       Screenshots rendered from the real UI code, case previews
+tools/      analyze.py (re-run the analysis on a PC), font/icon/logo generators
+docs/       Screenshots rendered from the real UI code, case previews, the bring-up rig
 ```
 
-Status: the firmware compiles, and its analysis code passes unit tests. Its screens
-were rendered on a PC from the real UI code (see `docs/`). The case was checked for
-collisions against Waveshare's STEP model. **None of it has run on real hardware yet.**
-The checklist under "First power-on" covers what to verify.
+Status: the firmware compiles and its analysis code passes unit tests; the screens were
+rendered on a PC from the real UI code (see `docs/`); the case was checked for
+collisions against Waveshare's STEP model. The firmware has also been run on real
+ESP32-S3 hardware, on a smaller bring-up board (see `docs/TEST_RIG.md`), which is what
+caught two faults the off-device checks had all passed over.
+
+**It has not run on the Waveshare 7B itself.** Nothing about that panel, its touch
+controller, the SD slot or the BME280 is verified. The checklist under "First power-on"
+covers what to check.
 
 ---
 
@@ -93,10 +100,14 @@ The touch controller and IO expander share this bus. The BME280 can be at addres
 ```bash
 pip install platformio
 cd firmware
-pio run                      # build
+pio run                      # build the station firmware
 pio run -t upload            # first flash over USB
 pio device monitor           # serial log, 115200
 ```
+
+`pio run` with no `-e` builds the product target (`station`). The other environments are
+`station_ota` (the same firmware, flashed over the network) and `tdisplay` (a bring-up
+board, not a product target -- see section 9).
 
 Later updates can go over Wi-Fi/VPN from the web page (Data & updates → Firmware
 update, upload `.pio/build/station/firmware.bin`), or with
@@ -213,6 +224,7 @@ python3 tools/analyze.py pain.csv pressure.csv --utc-offset -7 --plot chart.png
 - `firmware/test/test_trends.cpp`: tests for the long-term aggregates (same build line, add `../src/trends.cpp`).
 - `firmware/test/web/mock_server.py`: serves the real web page with 14 months of synthetic data (`python3 mock_server.py`, then open http://localhost:8765). `shoot.py` takes Playwright screenshots of it.
 - `firmware/test/host/build.sh`: renders the real screens to PNG on a PC (after one `pio run`), for checking layout changes without hardware.
-- Fonts: Atkinson Hyperlegible (Braille Institute, SIL OFL), regenerated with `tools/gen_fonts.sh`; icons with `tools/gen_icons.py`.
+- **Bring-up rig** (`pio run -e tdisplay -t upload`): runs this firmware on a LilyGO T-Display-S3, so it can be exercised on real silicon before the 7B arrives. It is not a product target and cannot become one: its board layer and serial console are excluded from every other environment and guarded by `#ifdef BOARD_TDISPLAY_S3`, and no production file branches on that macro. The whole of it costs the station firmware 7 bytes -- one `board::has_sd_slot()`. See `docs/TEST_RIG.md`.
+- Fonts: Atkinson Hyperlegible (Braille Institute, SIL OFL), regenerated with `tools/gen_fonts.sh`; weather icons with `tools/gen_icons.py`; the boot logo with `tools/gen_logo.py`.
 - Board details (pins, timing, IO expander at 0x24, inverted backlight PWM) come from Waveshare's examples: github.com/waveshareteam/ESP32-S3-Touch-LCD-7B.
 - Weather and geocoding come from Open-Meteo (free, no key). HTTPS certificates aren't pinned, because the data is public and pinning breaks when certificates rotate.

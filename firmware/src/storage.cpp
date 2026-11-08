@@ -47,7 +47,7 @@ void read_lines(const char* path, const std::function<void(char*)>& fn) {
 bool begin() {
   board::sd_cs_high();
   delay(10);
-  if (SD_MMC.setPins(pins::SD_CLK, pins::SD_CMD, pins::SD_D0) &&
+  if (board::has_sd_slot() && SD_MMC.setPins(pins::SD_CLK, pins::SD_CMD, pins::SD_D0) &&
       SD_MMC.begin("/sdcard", /*mode1bit=*/true, /*format_if_mount_failed=*/false)) {
     sd_ok = true;
     log_i("Logging to microSD");

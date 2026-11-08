@@ -13,7 +13,7 @@ String default_device_name() {
   uint8_t mac[6];
   WiFi.macAddress(mac);
   char buf[32];
-  snprintf(buf, sizeof buf, "weatherstation-%02x%02x", mac[4], mac[5]);
+  snprintf(buf, sizeof buf, "oldmanweather-%02x%02x", mac[4], mac[5]);
   return buf;
 }
 

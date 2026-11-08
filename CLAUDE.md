@@ -6,6 +6,9 @@ whoever (human or AI) continues development.
 
 ## What this is
 
+**Old Man Weather** (the name, used everywhere: the boot screen, the web page, the HTTP
+auth realm and the default device name `oldmanweather-xxxx`).
+
 A 7" ESP32-S3 tabletop weather station for an **elderly family member**. It shows the
 internet forecast, logs barometric pressure, and lets him log pain (1-5) with one tap,
 so pain can be correlated with pressure changes. Family members maintain it remotely
@@ -21,12 +24,15 @@ Direction A (cloud gent) is the chosen one; its Boot artboard is exported to
 
 ## Status (as of v1.2.0, 2026-11-07)
 
-- **Never run on the Waveshare 7B yet**, but no longer never run at all. The firmware
-  was brought up on a LilyGO T-Display-S3 (a 320x170 panel) as a temporary rig, with
-  the real 1024x600 UI rendered into a PSRAM canvas and shown scaled. That rig is
-  removed again; see "What the hardware bring-up found" below for what it proved. The
-  rig itself is in this branch's history, between v1.1.0 and v1.2.0, if it is ever
-  wanted again.
+- **Never run on the Waveshare 7B yet**, but no longer never run at all. `env:tdisplay`
+  brings the firmware up on a LilyGO T-Display-S3 (a 320x170 panel), with the real
+  1024x600 UI rendered into a PSRAM canvas and shown scaled. See docs/TEST_RIG.md, and
+  "What the hardware bring-up found" below for what it caught.
+- That rig cannot weigh down the product, and this is a constraint to keep: no
+  production file branches on `BOARD_TDISPLAY_S3`, the rig's two files are excluded by
+  `build_src_filter`, and the only shared code it adds is `board::has_sd_slot()`, 7
+  bytes in the station image. If the rig ever needs something from production code,
+  add a public API production would want anyway -- do not add a hook.
 - Verified off-device:
   - the firmware compiles (PlatformIO, about 39 % of the 6.25 MB app slot);
   - the analysis has host unit tests (`test_pain.cpp`, `test_trends.cpp`), and the
@@ -46,7 +52,7 @@ Running on a real ESP32-S3 found three things that no amount of off-device check
 2. **The pain trend was not smooth.** Three discontinuities in the estimator put jumps
    of over 2 points (on a 1-5 scale) between adjacent 30-minute samples. Fixed; see the
    algorithm notes.
-3. **Press-and-hold and colour order** were rig-specific and went with the rig.
+3. **Press-and-hold and colour order** on the rig itself, which are rig-specific.
 
 The lesson worth keeping: the off-device checks all passed while the product did not
 work. Compiling, unit tests, host-rendered screens and a mocked web page between them
@@ -120,7 +126,8 @@ firmware/src/
   main.cpp        setup/loop; watchdog 30 s; marks the OTA image valid after 60 s (rollback)
   config.h        pins, panel timing, IO-expander bits, colours (match the mockup)
   board.*         I2C (Wire on 8/9), IO expander, RGB panel (esp_lcd), GT911 touch +
-                  invisible touch filter, LVGL glue, backlight
+                  invisible touch filter, LVGL glue, backlight, 180-degree flip
+  board_tdisplay.cpp, testrig.cpp   bring-up rig only (env tdisplay, never production)
   ui.*            routing, sunrise/sunset dimming, OTA overlay
   ui_boot.cpp     boot screen: the Old Man Weather mark, then the wordmark bar
   ui_main.cpp     main screen (the layout above); pain buttons fire on PRESSED

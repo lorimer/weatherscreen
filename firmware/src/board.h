@@ -14,6 +14,10 @@ uint8_t backlight();
 // Turns the picture and touch 180 degrees, for a unit standing the other way up.
 void set_flipped(bool on);
 
+// False on a bring-up board whose SD pins are wired to something else, so storage
+// knows to go straight to internal flash instead of driving them.
+bool has_sd_slot();
+
 // Raises the SD card's chip-select line through the expander (needed before SD_MMC).
 void sd_cs_high();
 

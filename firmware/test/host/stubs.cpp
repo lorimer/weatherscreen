@@ -27,7 +27,7 @@ bool connected() { return true; }
 String ip() { return "192.168.1.50"; }
 int rssi() { return -52; }
 bool ap_active() { return false; }
-String ap_name() { return "weatherstation-a1b2"; }
+String ap_name() { return "oldmanweather-a1b2"; }
 void set_setup_active(bool) {}
 void request_weather() {}
 void request_reconnect() {}
@@ -44,7 +44,7 @@ namespace settings {
 Settings s;
 Settings& get() { return s; }
 void save() {}
-String hostname() { return "weatherstation-a1b2"; }
+String hostname() { return "oldmanweather-a1b2"; }
 }
 namespace history {
 int taps_added = 0;

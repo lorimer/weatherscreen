@@ -1,4 +1,4 @@
-// LVGL 8.3 configuration for the Weather & Pain Station.
+// LVGL 8.3 configuration for Old Man Weather.
 // Anything not set here takes LVGL's default (lv_conf_internal.h).
 #if 1
 #ifndef LV_CONF_H

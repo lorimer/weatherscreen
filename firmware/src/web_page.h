@@ -4,7 +4,7 @@
 
 static const char WEB_PAGE[] = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Weather &amp; Pain Station</title>
+<title>Old Man Weather</title>
 <style>
 :root{--bg:#F6F3EC;--card:#fff;--ink:#1C1B19;--mut:#5A564E;--rule:#DDD6C8;--blue:#2B5F9E;--red:#B3261E;--org:#A84B0C;--grn:#2F7D4F}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -39,7 +39,7 @@ svg{width:100%;height:auto;display:block;user-select:none;-webkit-user-select:no
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:4px}.legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
 .busy{opacity:.5;transition:opacity .2s}
 </style></head><body>
-<header><h1 id="name">Weather &amp; Pain Station</h1><span id="sub"></span></header>
+<header><h1 id="name">Old Man Weather</h1><span id="sub"></span></header>
 <nav><button data-t="ov" class="on">Overview</button><button data-t="trends">Trends</button><button data-t="se">Settings</button><button data-t="da">Data &amp; updates</button></nav>
 <main>
 <section id="ov" class="on"><div class="grid">

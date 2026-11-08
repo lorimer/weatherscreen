@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Weather & Pain Station - 3D-printed tabletop case for the
+Old Man Weather - 3D-printed tabletop case for the
 Waveshare ESP32-S3-Touch-LCD-7B (7", 1024x600).
 
 Two printed parts:

@@ -33,7 +33,7 @@ namespace settings {
 void load();
 void save();
 Settings& get();               // live copy; call save() after changing
-String default_device_name();  // weatherstation-xxxx from the MAC address
+String default_device_name();  // oldmanweather-xxxx from the MAC address
 String hostname();             // sanitised device name
 void factory_reset();
 }  // namespace settings

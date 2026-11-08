@@ -110,7 +110,7 @@ def correlation(fr, to):
             out.append({"window_h": w, "lag_h": lag, "r": None if c is None else round(c, 3), "n": n})
     return {"lags": out}
 
-STATUS = {"device_name": "weatherstation-a1b2", "hostname": "weatherstation-a1b2", "place": "Grand Junction, Colorado, United States",
+STATUS = {"device_name": "oldmanweather-a1b2", "hostname": "oldmanweather-a1b2", "place": "Grand Junction, Colorado, United States",
           "firmware": "1.1.0", "uptime_s": 86400 * 3, "ip": "192.168.1.50", "wifi": "HomeNetwork (-52 dBm)", "weather_ok": True,
           "weather_error": "", "weather_fetched": NOW - 300, "sensor": "BME280", "last_sensor": NOW - 60, "sensor_humidity": 31,
           "storage": "microSD, 3 of 15193 MB used", "taps": len(taps), "pressure_samples": len(pres), "backlight": 100,
@@ -130,7 +130,7 @@ class H(BaseHTTPRequestHandler):
         routes = {"/api/status": lambda: STATUS, "/api/range": lambda: {"first": taps[0][0], "now": NOW},
                   "/api/series": lambda: series(fr, to), "/api/daily": lambda: daily(fr, to),
                   "/api/profile": lambda: profile(fr, to), "/api/correlation": lambda: correlation(fr, to),
-                  "/api/settings": lambda: {"device_name": "weatherstation-a1b2"}}
+                  "/api/settings": lambda: {"device_name": "oldmanweather-a1b2"}}
         if u.path == "/": return self.send(PAGE, "text/html")
         if u.path in routes: return self.send(json.dumps(routes[u.path]()))
         self.send_response(404); self.end_headers()

@@ -243,6 +243,8 @@ void set_flipped(bool on) {
   lv_obj_invalidate(lv_scr_act());  // nothing cached is valid any more
 }
 
+bool has_sd_slot() { return true; }
+
 void sd_cs_high() { ioex_pin(ioex::PIN_SD_CS, true); }
 
 bool lvgl_lock(uint32_t timeout_ms) {
